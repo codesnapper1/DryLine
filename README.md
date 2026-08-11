@@ -2,20 +2,47 @@
 
 **Live track condition detection for motorsport, powered by vision-language models.**
 
+![Backend](https://img.shields.io/badge/backend-FastAPI-009688)
+![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-61DAFB)
+![VLM](https://img.shields.io/badge/vision-Gemini%20%C2%B7%20Groq%20%C2%B7%20OpenRouter-8A2BE2)
+![Hackathon](https://img.shields.io/badge/Grand%20Prix%20AI%20Hackathon-2026-E10600)
+
 ![DRYLINE demo](demo.gif)
 
-DRYLINE watches trackside or onboard camera footage and reports, in real
-time, whether the racing surface is **Dry**, **Damp**, **Wet**, or
-**Drying** — and when it's drying, how many laps remain until the next
-tire-compound window opens. Built for the Grand Prix AI Hackathon
-(sponsor: Mphasis, Official Digital Partner of Haas F1).
+**Contents:** [Why this isn't just another VLM wrapper](#why-this-isnt-just-another-vlm-wrapper) ·
+[How it works](#how-it-works) · [Architecture](#architecture) · [Features](#features) ·
+[Research & related work](#research--related-work) · [Tech stack](#tech-stack) ·
+[Getting started](#getting-started)
 
-## The idea
+---
 
-A single photo of a drying track and a photo of a damp track can be
-pixel-identical. "Drying" isn't something you can see — it's a rate of
-change. So DRYLINE never asks a model to output a condition directly.
-Instead:
+Hundreds of teams at this hackathon will point a vision model at a photo and
+ask it "is this track dry, damp, wet, or drying?" Most of them will ship
+exactly that, watch it flicker between labels on consecutive frames of the
+same clip, and never figure out why. **Drying is not a thing you can see in
+one photograph — it's a rate of change, and no single image contains a
+rate.** DRYLINE is built around that one fact, and everything else in this
+repo follows from it.
+
+## Why this isn't just another VLM wrapper
+
+| | The obvious approach | DRYLINE |
+|---|---|---|
+| **Per-frame output** | Ask the model directly for one of 4 labels | Ask for *observations* (gloss, standing water, spray, reflections, dry patches) — never the label itself |
+| **"Drying" detection** | Guessed from a single frame → flickers between Wet/Damp/Drying on a static clip | *Rendered* from a smoothed rate of change → mathematically cannot appear without the trend actually falling |
+| **Signal source** | One region of the frame | Two regions — on the racing line and off it. Their divergence is an early-warning signal, months of racing physics say the line dries first |
+| **When the model is unsure** | Prints an answer anyway | Explicit LOW CONFIDENCE — blur, exposure, occlusion, or low model confidence all gate the output |
+| **Provider resilience** | One API call; the whole demo dies if it's rate-limited mid-pitch | Ordered failover across three providers, response caching, a queueing rate limiter |
+| **Weather** | Not used, or bolted on as a text field nobody reads | Live independent cross-check against actual rain data — a second opinion on the same question |
+| **If the WiFi drops during judging** | Demo is over | Boots and runs the full pipeline with zero API keys — this is how it was built and tested |
+
+None of this is decoration. Run the app, flip the **Naive Classifier A/B**
+toggle in the footer, and watch the *actual failure mode* happen live next to
+the stable output — the flicker on the left is what "the obvious approach"
+looks like on real data, side by side with the reason it doesn't ship in
+this project.
+
+## How it works
 
 1. A vision-language model reports what it **observes** in each frame —
    surface gloss, standing water, reflections, spray, dry patches forming —
@@ -27,14 +54,8 @@ Instead:
    never guessed from a single picture.
 
 The model is treated as a noisy sensor. Everything downstream of it is
-ordinary, auditable state estimation.
-
-A second signal comes from watching two regions per frame instead of one:
-the racing line and the area just off it. The line dries first — tire heat
-and airflow scrub water off the rubbered-in surface before the rest of the
-track catches up. The gap between the two readings is the earliest
-available warning that a tire crossover is coming, which is what turns the
-tire-change suggestion into something grounded rather than decorative.
+ordinary, auditable state estimation — no part of the final label comes from
+a prompt asking "what's the condition?"
 
 ## Architecture
 
@@ -82,8 +103,8 @@ confidence gate            evidence → wetness score
 - **Live evidence panel** — the model's raw observations are shown next to
   the frame, not just its conclusion.
 - **Naive-classifier comparison** — a plain per-frame classifier rendered
-  side by side with the real pipeline, to show why the temporal-filter
-  approach exists in the first place.
+  side by side with the real pipeline, so the failure mode this project is
+  built to avoid is visible on demand, not just claimed.
 - **Auto-generated session notes** — a deterministic, template-based recap
   of a session's condition changes, no LLM involved.
 - **Weather cross-check** — an independent agree/disagree signal from live
