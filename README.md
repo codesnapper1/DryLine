@@ -1,58 +1,120 @@
 # DRYLINE
 
-**Weather Whiplash: Live Track Condition Detector** — Grand Prix AI Hackathon
-online qualifier submission. See [CLAUDE.md](CLAUDE.md) for the full
-architecture and constraints, [PLAN.md](PLAN.md) for build phases and status.
+**Live track condition detection for motorsport, powered by vision-language models.**
 
-DRYLINE treats the four required labels differently on purpose: **Dry**,
-**Damp**, and **Wet** are appearances a vision-language model can observe in a
-single frame; **Drying** is a time derivative it cannot. A hosted VLM reports
-structured visual evidence per frame (gloss, standing water, spray, dry
-patches forming); a deterministic alpha-beta filter turns that into a
-smoothed wetness level and rate; the label is *rendered* from the
-(level, rate) pair, not predicted directly. See CLAUDE.md section 2 before
-changing that split.
+![DRYLINE demo](demo.gif)
 
-## Compliance table
+DRYLINE watches trackside or onboard camera footage and reports, in real
+time, whether the racing surface is **Dry**, **Damp**, **Wet**, or
+**Drying** — and when it's drying, how many laps remain until the next
+tire-compound window opens. Built for the Grand Prix AI Hackathon
+(sponsor: Mphasis, Official Digital Partner of Haas F1).
 
-Every line of the organizers' problem statement, mapped to the file and
-endpoint that satisfies it. Status is honest as of the last update — `stub`
-means the pipeline stage exists and is wired end to end, but is driven by a
-scripted placeholder rather than the real hosted VLM yet (PLAN.md Phase 1-2
-vs Phase 3).
+## The idea
 
-| Problem statement line | File(s) | Endpoint | Status |
-|---|---|---|---|
-| "Feed in images or short video frames from a camera (trackside or onboard)." | [backend/main.py](backend/main.py) | `POST /session/{id}/frame`, `POST /session/{id}/video` | done |
-| "The AI looks at each image and tells you if the track looks Dry, Damp, Wet, or Drying." | [backend/vlm.py](backend/vlm.py), [backend/decision.py](backend/decision.py) | `GET /session/{id}/decision` | stub (scripted decider; real VLM is Phase 3) |
-| "Over time, it shows a simple trend: is the track getting better or worse?" | [backend/temporal.py](backend/temporal.py), [frontend/src/components/TrendChart.tsx](frontend/src/components/TrendChart.tsx) | `GET /session/{id}/series` | done |
-| "...it gives a suggestion like 'Consider tire change soon.'" | [backend/decision.py](backend/decision.py) (`SUGGESTIONS`), [frontend/src/components/InsightPanel.tsx](frontend/src/components/InsightPanel.tsx) | `GET /session/{id}/decision` | done — includes the verbatim string, see below |
-| "Input: photos or video frames, basic weather info (optional)." | [backend/main.py](backend/main.py), [backend/weather.py](backend/weather.py) | `POST /session/{id}/frame`, `POST /session/{id}/video` | weather.py not wired yet (planned) |
-| "Output: a label per image, a simple trend graph, and a suggestion message." | [backend/main.py](backend/main.py) | `GET /session/{id}/decision`, `GET /session/{id}/series`, `GET /session/{id}/export.csv` | done |
-| **Frontend:** uploaded image, predicted condition, trend line, all on one screen. | [frontend/src/App.tsx](frontend/src/App.tsx) | — | done |
-| **Backend:** where images are processed and the AI decides the condition. | [backend/main.py](backend/main.py), [backend/vlm.py](backend/vlm.py) | full API | stub decider, real pipeline wiring done |
-| UI must literally display **Dry / Damp / Wet / Drying**. | [frontend/src/components/StatusChip.tsx](frontend/src/components/StatusChip.tsx) | — | done |
-| Suggestion string exactly `"Track drying: tire change window approaching."` | [backend/decision.py](backend/decision.py) (`SUGGESTIONS["DRYING"]`) | `GET /session/{id}/decision` | done, verbatim |
+A single photo of a drying track and a photo of a damp track can be
+pixel-identical. "Drying" isn't something you can see — it's a rate of
+change. So DRYLINE never asks a model to output a condition directly.
+Instead:
 
-## Running it
+1. A vision-language model reports what it **observes** in each frame —
+   surface gloss, standing water, reflections, spray, dry patches forming —
+   not a label, not even a wetness number.
+2. That evidence is scored into a continuous wetness value, then smoothed
+   over time with a temporal filter that also tracks the *rate* of change.
+3. The label is **rendered**, deterministically, from that (level, rate)
+   pair. "Drying" means a wet-ish surface with a falling rate — computed,
+   never guessed from a single picture.
 
-See [CLAUDE.md](CLAUDE.md) for environment setup (this machine's `python3` on
-PATH is an MSYS2 build with no matching wheels for numpy/opencv — use
-`py -3.14 -m venv .venv` instead, see CLAUDE.md's Environment section).
+The model is treated as a noisy sensor. Everything downstream of it is
+ordinary, auditable state estimation.
+
+A second signal comes from watching two regions per frame instead of one:
+the racing line and the area just off it. The line dries first — tire heat
+and airflow scrub water off the rubbered-in surface before the rest of the
+track catches up. The gap between the two readings is the earliest
+available warning that a tire crossover is coming, which is what turns the
+tire-change suggestion into something grounded rather than decorative.
+
+## Architecture
+
+```
+camera frame
+     │
+     ▼
+ROI crop (on-line / off-line) + colour correction
+     │
+     ▼
+composite image ──► hosted VLM (Gemini → Groq → OpenRouter, ordered failover)
+     │                              │
+     │                        structured evidence
+     │                              │
+     ▼                              ▼
+confidence gate            evidence → wetness score
+     │                              │
+     └──────────────┬───────────────┘
+                     ▼
+           alpha-beta temporal filter
+                     │
+                     ▼
+        level + rate → rendered label
+                     │
+                     ▼
+     trend graph · suggestion · tire-crossover ETA
+```
+
+## Features
+
+- **Four-state condition detection** — Dry, Damp, Wet, Drying — rendered
+  from smoothed state, with hysteresis so the displayed label can't flicker
+  more than once every 20 seconds.
+- **Dual-ROI crossover estimate** — on-line vs. off-line divergence drives a
+  laps-to-crossover projection for the next tire compound.
+- **Ordered VLM failover** — Gemini → Groq → OpenRouter, with retries,
+  backoff, a perceptual-hash response cache, and a rate limiter that queues
+  instead of erroring. Runs on scripted synthetic data with zero API keys
+  configured, so the app is always demoable.
+- **Confidence gating** — blurry frames, extreme luminance, low model
+  confidence, or occluded views all surface an explicit LOW CONFIDENCE state
+  instead of a guess.
+- **Live evidence panel** — the model's raw observations are shown next to
+  the frame, not just its conclusion.
+- **Naive-classifier comparison** — a plain per-frame classifier rendered
+  side by side with the real pipeline, to show why the temporal-filter
+  approach exists in the first place.
+- **Auto-generated session notes** — a deterministic, template-based recap
+  of a session's condition changes, no LLM involved.
+- **Weather cross-check** — an independent agree/disagree signal from live
+  Open-Meteo rain data, compared against the observed trend.
+- **CSV export** of the full session trace for further analysis.
+
+## Tech stack
+
+FastAPI · React + Vite + Tailwind + Recharts · Gemini / Groq / OpenRouter
+vision APIs · Open-Meteo · JSON-file persistence (no database).
+
+## Getting started
 
 ```bash
-cd backend && ../.venv/Scripts/python.exe -m uvicorn main:app --port 8000
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --port 8000
 ```
+
 ```bash
-cd frontend && npm install && npm run dev
+cd frontend
+npm install
+npm run dev
 ```
 
-The app boots and serves cached/precomputed sessions with **zero API keys
-set**. Live VLM inference (PLAN.md Phase 3) needs at least one provider key —
-copy [.env.example](.env.example) to `.env` and fill in what you have.
+Copy `.env.example` to `.env` and add a provider key to enable live VLM
+inference — the app runs fully on scripted data with no keys set, so this
+is optional for exploring the UI.
 
-## Non-goals
+## Roadmap
 
-No auth, no user accounts, no database (JSON on disk), no Docker, no cloud
-deploy, no model training, no automatic road segmentation, no mobile layout.
-See CLAUDE.md section 10 for the full list and why.
+- Curate the reference frame set (dry/damp/wet/standing water) and a
+  library of validated demo clips.
+- Precompute and commit replay sessions for a guaranteed offline demo path.
+- Wire the naive-classifier comparison to an independent single-call model
+  rather than a client-side approximation.

@@ -34,7 +34,7 @@ import weather
 app = FastAPI(title="DRYLINE backend")
 
 # Dev-only: frontend (Vite, localhost:5173) calls this API directly from the
-# browser. No auth/production concerns here per CLAUDE.md non-goals.
+# browser. No auth/production concerns for a hackathon demo.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

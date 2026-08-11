@@ -1,6 +1,6 @@
-"""JSON-file session persistence. No database, per CLAUDE.md non-goals — each
-session is one JSON file under store/sessions/<id>.json holding its config,
-filter state, hysteresis state, and full frame history.
+"""JSON-file session persistence — no database, by design. Each session is
+one JSON file under store/sessions/<id>.json holding its config, filter
+state, hysteresis state, and full frame history.
 """
 
 import json
