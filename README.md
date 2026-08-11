@@ -65,6 +65,8 @@ confidence gate            evidence → wetness score
 
 ## Features
 
+### Built and working
+
 - **Four-state condition detection** — Dry, Damp, Wet, Drying — rendered
   from smoothed state, with hysteresis so the displayed label can't flicker
   more than once every 20 seconds.
@@ -88,6 +90,62 @@ confidence gate            evidence → wetness score
   Open-Meteo rain data, compared against the observed trend.
 - **CSV export** of the full session trace for further analysis.
 
+### Planned
+
+- A curated reference frame set (dry/damp/wet/standing water) and a library
+  of validated demo clips, cut from real trackside/onboard footage.
+- Precomputed, committed replay sessions for a guaranteed offline demo path
+  with zero network dependency at demo time.
+- An independent single-call baseline model behind the naive-classifier
+  comparison, replacing today's client-side approximation.
+- A judge-facing clip picker for live, on-demand inference during review.
+
+## Research & related work
+
+**Structured evidence extraction instead of a direct answer.** Vision-language
+models are known to be unreliable at precise numeric estimation but far more
+consistent when asked to report discrete, observable attributes — especially
+when given few-shot visual references to compare against, a well-documented
+property of in-context learning in large language and vision-language models
+alike (Brown et al., *Language Models are Few-Shot Learners*, NeurIPS 2020;
+Bai et al., *Qwen-VL*, 2023). DRYLINE sends four reference images
+(dry/damp/wet/standing water) with every call and asks for schema-constrained
+JSON evidence rather than a wetness percentage, for exactly this reason.
+
+**A temporal filter instead of a bigger model.** Treating "drying" as a rate
+of change rather than a visual class is a direct application of classical
+recursive state estimation — the alpha-beta (g-h) filter used here is a
+steady-state simplification of the Kalman filter (Kalman, *A New Approach to
+Linear Filtering and Prediction Problems*, 1960), the same family of
+techniques used from spacecraft navigation to modern object tracking.
+
+**Why this is visually tractable at all.** Road and track surface wetness is
+a well-studied computer vision problem. Large annotated datasets such as
+RSCD (Road Surface Classification Dataset, ~1M images across six
+friction-level classes including dry, wet, standing water, and snow/ice) and
+dedicated CNN classifiers evaluated on real driving footage have demonstrated
+90%+ accuracy distinguishing dry from wet surfaces from ordinary camera
+images. That prior work establishes the underlying visual signal is real and
+learnable — which is exactly why a general-purpose VLM, with no training of
+its own, can pick it up too.
+
+**Why this matters for race strategy.** Tire-change timing is an active area
+of motorsport analytics research, not a toy problem: Heilmeier et al. (TU
+Munich / BMW Motorsport, *Applied Sciences*, 2020) built a neural pit-stop
+decision system trained on six seasons of Formula 1 timing data, and more
+recent work (*Frontiers in Artificial Intelligence*, 2025) applies deep
+learning directly to pit-stop decision support. DRYLINE's crossover estimate
+is aimed at feeding exactly this kind of decision with an earlier,
+physically-grounded signal than lap-time delta alone.
+
+References:
+- Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems.*
+- Brown, T. et al. (2020). [*Language Models are Few-Shot Learners.*](https://arxiv.org/abs/2005.14165) NeurIPS.
+- Bai, J. et al. (2023). [*Qwen-VL: A Versatile Vision-Language Model.*](https://arxiv.org/abs/2308.12966)
+- [*RSCD: A road surface image dataset with detailed annotations for driving assistance applications.*](https://www.sciencedirect.com/science/article/pii/S2352340922006771)
+- Heilmeier, A. et al. (2020). [*Virtual Strategy Engineer: Using Artificial Neural Networks for Making Race Strategy Decisions in Circuit Motorsport.*](https://www.mdpi.com/2076-3417/10/21/7805) Applied Sciences.
+- [*Data-driven pit stop decision support for Formula 1 using deep learning models.*](https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2025.1673148/full) Frontiers in AI (2025).
+
 ## Tech stack
 
 FastAPI · React + Vite + Tailwind + Recharts · Gemini / Groq / OpenRouter
@@ -110,11 +168,3 @@ npm run dev
 Copy `.env.example` to `.env` and add a provider key to enable live VLM
 inference — the app runs fully on scripted data with no keys set, so this
 is optional for exploring the UI.
-
-## Roadmap
-
-- Curate the reference frame set (dry/damp/wet/standing water) and a
-  library of validated demo clips.
-- Precompute and commit replay sessions for a guaranteed offline demo path.
-- Wire the naive-classifier comparison to an independent single-call model
-  rather than a client-side approximation.
