@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+opencv-python-headless
+pydantic
+requests
+
+# VLM provider chain (vlm.py) — raw REST via httpx, no provider SDKs needed.
+python-dotenv
+httpx

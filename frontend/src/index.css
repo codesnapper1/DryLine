@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #0b0b0d;
+}
+
+.bg-carbon {
+  background-color: #0b0b0d;
+  background-image: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 6px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+}
+
+.track-placeholder {
+  background: linear-gradient(
+    to bottom,
+    #1c1c20 0%,
+    #2a2a2f 55%,
+    #38383e 75%,
+    #4a4a52 100%
+  );
+  position: relative;
+}
+
+.track-placeholder::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 38px,
+    rgba(255, 255, 255, 0.06) 38px,
+    rgba(255, 255, 255, 0.06) 42px
+  );
+  mask-image: linear-gradient(to bottom, transparent 40%, black 100%);
+}

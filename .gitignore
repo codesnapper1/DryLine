@@ -1,0 +1,37 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Secrets — never commit real API keys. Copy .env.example to .env.
+.env
+
+# VLM response cache (dhash -> response), fully regenerable, not a source artifact.
+demo/cache/*
+!demo/cache/.gitkeep
+
+# demo/precomputed/*.json IS committed on purpose (CLAUDE.md Demo Mode) — do
+# not add it here.
+
+# Weather cache
+backend/.weather_cache/
+
+# Live backend session store (JSON files, not sample/demo data)
+backend/store/
+
+# demo.sh generated artifacts
+backend/scripts/dummy_frame.jpg
+backend/scripts/demo_arc_*.csv
+
+# Raw demo footage is large and license-encumbered per clip — keep source
+# clips out of git, only commit what precompute.py derives from them.
+demo/clips/*
+!demo/clips/.gitkeep
+
+# OS/editor
+.DS_Store
+*.swp
