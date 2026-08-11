@@ -12,7 +12,7 @@ export interface Crossover {
 export type Provider = "stub" | "gemini" | "groq" | "openrouter" | "cache" | "none";
 
 // One region ("A"/"line" or "B"/"off_line") of a VLM evidence read — the raw
-// fields prompts.py asks for, per CLAUDE.md section 4's JSON schema.
+// fields prompts.py's JSON schema asks for.
 export interface EvidenceRegion {
   surface_gloss: "none" | "slight" | "moderate" | "mirror_like";
   reflections_visible: boolean;

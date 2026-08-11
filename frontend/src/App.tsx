@@ -9,9 +9,9 @@ import InsightPanel from "./components/InsightPanel";
 import Footer from "./components/Footer";
 import SessionSummary from "./components/SessionSummary";
 
-// Matches backend/scripts/demo.sh Part 1: a full wet -> drying -> dry arc,
+// Matches backend/scripts/demo.sh's arc: a full wet -> drying -> dry sweep,
 // tuned so the alpha-beta filter (alpha 0.15, beta 0.005) actually converges
-// at this sample spacing. See CLAUDE.md / PLAN.md Phase 1 for why.
+// at this sample spacing.
 // lat/lon is Silverstone Circuit — gives the weather cross-check something
 // real to compare against instead of sitting unavailable in the demo.
 const DEMO_CONFIG = {

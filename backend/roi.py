@@ -1,30 +1,30 @@
 """ROI crop + Shades-of-Gray colour constancy (p=6) per frame, plus the
-image-quality checks that feed the confidence/OOD gate (CLAUDE.md).
+image-quality checks that feed the confidence/OOD gate.
 
 This module is real (not stubbed): it operates on actual decoded image bytes.
-It has no dependency on vlm.py, so it does not change when the fake decider
-in vlm.py is swapped for the real hosted-VLM provider chain in PLAN.md Phase 3.
+It has no dependency on vlm.py, so the fake decider in vlm.py can be swapped
+for the real hosted-VLM provider chain without touching this file.
 
 build_composite() stitches the two ROI crops into one side-by-side image
 (labelled A: RACING LINE / B: OFF-LINE) so a single VLM call scores both
-regions — see CLAUDE.md's call-budget section for why that matters.
+regions instead of two — that halves the per-frame API call budget.
 """
 
 import cv2
 import numpy as np
 
 # Fractional (x, y, w, h) boxes, used when a session doesn't supply calibration
-# boxes of its own. Real deployments use the "10-second circuit calibration"
-# hand-drawn boxes (PLAN.md Phase 5 frontend) — these are just a reasonable
-# trackside-camera default (lower-center = racing line, lower-left = off line).
+# boxes of its own. Real deployments use hand-drawn "circuit calibration"
+# boxes from the frontend — these are just a reasonable trackside-camera
+# default (lower-center = racing line, lower-left = off line).
 DEFAULT_ROI_LINE = (0.35, 0.55, 0.30, 0.35)
 DEFAULT_ROI_OFF_LINE = (0.05, 0.55, 0.25, 0.35)
 
 MODEL_INPUT_SIZE = (224, 224)
 
-# Confidence/OOD gate thresholds (CLAUDE.md). Placeholder heuristics — these
-# get calibrated against real trackside footage in PLAN.md Phase 2/3; until
-# then they exist to prove the gate mechanism works, not to be precisely tuned.
+# Confidence/OOD gate thresholds. Placeholder heuristics — these get
+# calibrated against real trackside footage once some exists; until then
+# they exist to prove the gate mechanism works, not to be precisely tuned.
 BLUR_VAR_MIN = 50.0
 LUMINANCE_MIN = 20.0
 LUMINANCE_MAX = 235.0
@@ -90,8 +90,8 @@ def _label_corner(img: np.ndarray, text: str) -> None:
 
 def build_composite(rois: dict[str, dict]) -> np.ndarray:
     """Stitches the 'line' (A) and 'off_line' (B) crops side by side with a
-    thin white separator, one image per VLM call instead of two — see
-    CLAUDE.md's call-budget section. Expects the {"crop": ndarray, ...} shape
+    thin white separator, one image per VLM call instead of two, halving the
+    per-frame API call budget. Expects the {"crop": ndarray, ...} shape
     process_rois() returns.
     """
     left = rois["line"]["crop"].copy()

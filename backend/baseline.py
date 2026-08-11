@@ -1,8 +1,8 @@
 """Naive baseline: a single-call 4-class classifier (Dry/Damp/Wet/Drying) with
-no temporal awareness, used for the A/B comparison against the real pipeline
-(CLAUDE.md section 2's core thesis — a per-frame classifier cannot coherently
-predict "Drying" at all, and will flicker). See CLAUDE.md section 9 (Demo
-Mode) for how this is shown in the UI.
+no temporal awareness, used for the A/B comparison against the real pipeline.
+A per-frame classifier can't coherently predict "Drying" at all — that's the
+whole reason this project's pipeline is built the way it is, and showing this
+baseline flicker next to the real output is meant to make that visible.
 
-Not implemented yet — scaffold only (PLAN.md Phase 5).
+Not implemented yet — scaffold only.
 """

@@ -1,8 +1,7 @@
 """Deterministic session recap — a race-engineer's-notes style summary built
 by walking the already-recorded frame history for label transitions. No LLM
-anywhere here (CLAUDE.md's zero-cost stack: "no LLM in the critical path,
-ever") — this is template strings over data we already logged, the same
-spirit as decision.py's SUGGESTIONS dict.
+anywhere here — this is template strings over data we already logged, the
+same spirit as decision.py's SUGGESTIONS dict.
 """
 
 _LOW_CONF_NOTE_THRESHOLD = 1

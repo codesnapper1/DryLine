@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# DRYLINE Phase 1 demo: proves the ingest -> ROI -> stub-model -> alpha-beta
-# filter -> hysteresis -> label -> suggestion pipeline end to end, with no ML
-# involved yet. Requires the backend running: from backend/, `uvicorn main:app
-# --port 8000`.
+# DRYLINE pipeline demo: proves the ingest -> ROI -> stub-model -> alpha-beta
+# filter -> hysteresis -> label -> suggestion pipeline end to end, with no VLM
+# calls involved (runs against the scripted stub). Requires the backend
+# running: from backend/, `uvicorn main:app --port 8000`.
 #
 # Part 1 posts one frame every simulated 10s across a 15-minute session and
 # prints the decision every 50s, so you can watch WET -> DRYING -> DRY happen.

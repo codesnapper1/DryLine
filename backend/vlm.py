@@ -1,13 +1,13 @@
 """VLMProvider chain: ordered failover across hosted vision-language model
 providers (Google AI Studio -> Groq -> OpenRouter), used as the per-frame
-wetness "sensor." See CLAUDE.md section 3 — the VLM is a noisy sensor,
-everything downstream (temporal.py, decision.py) is deterministic state
-estimation over its output.
+wetness "sensor." The VLM is treated as a noisy sensor; everything
+downstream (temporal.py, decision.py) is deterministic state estimation
+over its output.
 
 Falls back automatically to a deterministic sine-plus-noise stub when no
-provider API key is configured (CLAUDE.md: "the app must start and serve
-cached sessions with zero keys set"). This is what backend/scripts/demo.sh
-still exercises, unchanged, with no keys present.
+provider API key is configured, so the app always boots and serves sessions
+with zero keys set. This is what backend/scripts/demo.sh still exercises,
+unchanged, with no keys present.
 
 predict() is the stable entry point main.py calls; its shape doesn't change
 between stub and real mode:
@@ -35,7 +35,7 @@ import roi as roi_mod
 
 logger = logging.getLogger(__name__)
 
-# --- stub (Phase 1) -----------------------------------------------------
+# --- stub (used automatically when no provider key is configured) -------
 
 STUB_CONFIDENCE = 0.92
 

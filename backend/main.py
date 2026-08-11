@@ -1,6 +1,5 @@
 """FastAPI app: ingest -> roi -> vlm(stub) -> temporal filter -> decision
-render, backed by JSON-file sessions (store.py). See CLAUDE.md and PLAN.md
-Phase 1 for the contract this implements.
+render, backed by JSON-file sessions (store.py).
 
 Run from inside backend/:
     uvicorn main:app --reload --port 8000
@@ -99,8 +98,8 @@ async def _ingest_frame(session: dict, img: np.ndarray, t: float, single_image: 
 
     # Total provider outage (every provider in the chain failed): don't feed a
     # missing/garbage measurement into the filter — carry the last known
-    # smoothed state forward untouched. See CLAUDE.md section 6: fail loud
-    # (LOW_CONFIDENCE), never interpolate, never present stale state as live.
+    # smoothed state forward untouched, fail loud with LOW_CONFIDENCE rather
+    # than interpolating or presenting stale state as if it were live.
     provider_outage = any(p.get("provider") == "none" for p in preds.values())
 
     filter_states = session["filter_state"]

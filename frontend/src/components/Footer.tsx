@@ -93,7 +93,7 @@ function ProviderIndicator({ frame }: { frame: DecisionFrame | null }) {
           value={forced}
           onChange={(e) => onChange(e.target.value)}
           className="rounded border border-neutral-700 bg-neutral-900 px-1.5 py-0.5 text-[11px] text-neutral-400"
-          title="force a specific provider (runtime-switchable, see CLAUDE.md section 3)"
+          title="force a specific provider — the chain is runtime-switchable"
         >
           <option value="auto">auto</option>
           {statuses.map((s) => (

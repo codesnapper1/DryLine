@@ -1,7 +1,6 @@
 """Alpha-beta filter (alpha 0.15, beta 0.005, dt from real timestamps) that
 turns noisy per-frame W into a smoothed level and a rate, plus the 20s
 minimum-dwell hysteresis that keeps the *displayed* label from chattering.
-See CLAUDE.md.
 """
 
 from dataclasses import asdict, dataclass
@@ -10,8 +9,8 @@ ALPHA = 0.15
 BETA = 0.005
 
 # Timestamp gap beyond which we refuse to trust a derivative computed across
-# it (CLAUDE.md OOD gate: "widen the confidence band; never interpolate
-# across it"). The filter resets rather than pretending it saw continuous data.
+# it — widen the confidence band rather than interpolate across it. The
+# filter resets rather than pretending it saw continuous data.
 MAX_GAP_S = 30.0
 
 DWELL_S = 20.0
@@ -39,8 +38,8 @@ def update(state: FilterState, z: float, t: float) -> tuple[FilterState, float, 
     """One alpha-beta filter step. Returns (new_state, rate_per_min, gap_exceeded).
 
     gap_exceeded=True means the caller should NOT trust rate/derivative-based
-    decisions for this frame (see CLAUDE.md confidence gate) — the filter has
-    snapped to the new measurement rather than interpolating.
+    decisions for this frame — the filter has snapped to the new measurement
+    rather than interpolating.
     """
     if state.last_t is None:
         return FilterState(x=z, v=0.0, last_t=t), 0.0, False

@@ -1,8 +1,8 @@
 """System + user prompt for the VLM evidence call, plus anchor-image loading
 (the 4 reference crops in demo/anchors/: dry, damp, wet, standing water, sent
-with every request to turn absolute judgment into comparison). See CLAUDE.md
-section 4 for why this is structured as evidence extraction, not a direct
-wetness number.
+with every request to turn absolute judgment into comparison). Structured as
+evidence extraction rather than a direct wetness number because VLMs are far
+more reliable reporting observations than estimating an absolute quantity.
 """
 
 import logging
@@ -51,10 +51,9 @@ def _find_anchor(name: str) -> Path | None:
 
 def load_anchor_bytes() -> list[bytes]:
     """Loads the 4 anchor crops in ANCHOR_ORDER, skipping any that don't exist
-    yet. demo/anchors/ is curated in PLAN.md Phase 4 — calling this before
-    that phase is done is expected and safe, it just returns fewer (or zero)
-    anchors, which the VLM call still works with, just less reliably per
-    CLAUDE.md section 4.
+    yet — demo/anchors/ isn't populated until real footage is curated. Calling
+    this before then is expected and safe: it just returns fewer (or zero)
+    anchors, which the VLM call still works with, just less reliably.
     """
     found: list[bytes] = []
     missing: list[str] = []
@@ -66,8 +65,7 @@ def load_anchor_bytes() -> list[bytes]:
             missing.append(name)
     if missing:
         logger.warning(
-            "demo/anchors/ missing %s — VLM calls will run with %d/%d few-shot anchors "
-            "(PLAN.md Phase 4 not done yet).",
+            "demo/anchors/ missing %s — VLM calls will run with %d/%d few-shot anchors.",
             missing,
             len(found),
             len(ANCHOR_ORDER),

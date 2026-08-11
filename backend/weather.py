@@ -1,6 +1,6 @@
-"""Open-Meteo client (keyless, free, no account — CLAUDE.md's zero-cost stack)
-disk-cached, always falls back to cache. This is the one permitted network
-call in the whole app, and it must never block or error whatever called it —
+"""Open-Meteo client (keyless, free, no account), disk-cached, always falls
+back to cache. This is the one network call in the whole app that isn't the
+VLM itself, and it must never block or error whatever called it —
 get_conditions() returns None on total failure (no live data, no cache),
 never raises.
 """

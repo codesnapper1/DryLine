@@ -1,17 +1,17 @@
-"""Label renderer + crossover lookup + suggestion strings. See CLAUDE.md for
-the exact threshold table — this module is the one place that table lives;
-nothing else should hardcode a wetness threshold.
+"""Label renderer + crossover lookup + suggestion strings. This module is the
+one place the wetness threshold table lives; nothing else should hardcode a
+threshold.
 
 "Drying" is rendered, never predicted: it's a function of (level, rate), not
-a class the VLM outputs. See CLAUDE.md's core insight before changing
-anything here.
+a class the VLM outputs. A single frame of a drying track and a damp track
+can be pixel-identical, so no per-frame call can ever tell them apart —
+don't reintroduce a direct classifier here.
 
 evidence_to_w() is the scoring step ahead of everything else in this file: the
 VLM (vlm.py) returns structured observations (gloss, standing water, spray,
 dry patches, ...) for one region, this turns them into a single W before it
-ever reaches classify_level(). Kept in this module because CLAUDE.md section
-4's threshold weights live next to the level thresholds they feed — one place
-for every hardcoded number in the scoring pipeline.
+ever reaches classify_level(). Kept in this module so every hardcoded number
+in the scoring pipeline lives in one place, next to the level thresholds it feeds.
 """
 
 LEVEL_DRY_MAX = 0.15
@@ -25,8 +25,8 @@ RATE_STABLE = 0.02  # W per minute; |rate| below this counts as stable
 CROSSOVER_WET_TO_INTER = 0.55
 CROSSOVER_INTER_TO_SLICK = 0.20
 
-# Evidence scoring (CLAUDE.md section 4) — turns one region's VLM observation
-# into a single W. Ordinal categorical fields are mapped to evenly-spaced
+# Evidence scoring — turns one region's VLM observation into a single W.
+# Ordinal categorical fields are mapped to evenly-spaced
 # scores; "not_visible" for spray is treated as "no evidence of spray", not
 # "definitely no spray" — it contributes 0, same as "none", rather than
 # fabricating evidence from an admitted blind spot.
@@ -46,8 +46,8 @@ def _clamp01(x: float) -> float:
 def evidence_to_w(ev: dict) -> tuple[float, float]:
     """One region's VLM evidence dict (the "A" or "B" object from prompts.py's
     JSON schema) -> (W, confidence). W_ev dominates over the model's own
-    wetness_0_100 self-report per CLAUDE.md section 4 — VLMs are unreliable at
-    absolute numeric estimation and reliable at reporting observations.
+    wetness_0_100 self-report — VLMs are unreliable at absolute numeric
+    estimation and reliable at reporting observations.
     """
     w_ev = _clamp01(
         EVIDENCE_WEIGHTS["gloss"] * _GLOSS_SCORE[ev["surface_gloss"]]
@@ -166,8 +166,8 @@ def build_decision(
     }
 
 
-# Weather cross-check (CLAUDE.md: "basic weather info (optional)" input) — a
-# simple, deliberately conservative heuristic comparing our VLM-observed trend
+# Weather cross-check — a simple, deliberately conservative heuristic
+# comparing our VLM-observed trend
 # against weather.py's rain data. This is a second, independent signal on the
 # same underlying question ("is the track drying or wetting"), not a
 # correction to the VLM reading — "unknown" is a legitimate, common answer.
