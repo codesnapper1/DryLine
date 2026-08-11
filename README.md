@@ -5,7 +5,6 @@
 ![Backend](https://img.shields.io/badge/backend-FastAPI-009688)
 ![Frontend](https://img.shields.io/badge/frontend-React%20%2B%20TypeScript-61DAFB)
 ![VLM](https://img.shields.io/badge/vision-Gemini%20%C2%B7%20Groq%20%C2%B7%20OpenRouter-8A2BE2)
-![Hackathon](https://img.shields.io/badge/Grand%20Prix%20AI%20Hackathon-2026-E10600)
 
 ![DRYLINE demo](demo.gif)
 
@@ -16,13 +15,12 @@
 
 ---
 
-Hundreds of teams at this hackathon will point a vision model at a photo and
-ask it "is this track dry, damp, wet, or drying?" Most of them will ship
-exactly that, watch it flicker between labels on consecutive frames of the
-same clip, and never figure out why. **Drying is not a thing you can see in
-one photograph — it's a rate of change, and no single image contains a
-rate.** DRYLINE is built around that one fact, and everything else in this
-repo follows from it.
+The obvious way to build this is to point a vision model at a photo and ask
+it "is this track dry, damp, wet, or drying?" That ships fast, flickers
+between labels on consecutive frames of the same clip, and never explains
+why. **Drying is not a thing you can see in one photograph — it's a rate of
+change, and no single image contains a rate.** DRYLINE is built around that
+one fact, and everything else in this repo follows from it.
 
 ## Why this isn't just another VLM wrapper
 
@@ -32,9 +30,9 @@ repo follows from it.
 | **"Drying" detection** | Guessed from a single frame → flickers between Wet/Damp/Drying on a static clip | *Rendered* from a smoothed rate of change → mathematically cannot appear without the trend actually falling |
 | **Signal source** | One region of the frame | Two regions — on the racing line and off it. Their divergence is an early-warning signal, months of racing physics say the line dries first |
 | **When the model is unsure** | Prints an answer anyway | Explicit LOW CONFIDENCE — blur, exposure, occlusion, or low model confidence all gate the output |
-| **Provider resilience** | One API call; the whole demo dies if it's rate-limited mid-pitch | Ordered failover across three providers, response caching, a queueing rate limiter |
+| **Provider resilience** | One API call; a rate limit or an outage takes the whole thing down | Ordered failover across three providers, response caching, a queueing rate limiter |
 | **Weather** | Not used, or bolted on as a text field nobody reads | Live independent cross-check against actual rain data — a second opinion on the same question |
-| **If the WiFi drops during judging** | Demo is over | Boots and runs the full pipeline with zero API keys — this is how it was built and tested |
+| **No network available** | Nothing works | Boots and runs the full pipeline with zero API keys — this is how it was built and tested |
 
 None of this is decoration. Run the app, flip the **Naive Classifier A/B**
 toggle in the footer, and watch the *actual failure mode* happen live next to
@@ -119,7 +117,7 @@ confidence gate            evidence → wetness score
   with zero network dependency at demo time.
 - An independent single-call baseline model behind the naive-classifier
   comparison, replacing today's client-side approximation.
-- A judge-facing clip picker for live, on-demand inference during review.
+- A clip picker in the UI for live, on-demand inference on any validated clip.
 
 ## Research & related work
 
