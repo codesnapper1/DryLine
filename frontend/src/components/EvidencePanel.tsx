@@ -17,7 +17,7 @@ function fieldValue(region: EvidenceRegion, key: keyof EvidenceRegion): string {
 
 function RegionColumn({ label, color, region }: { label: string; color: string; region: EvidenceRegion }) {
   return (
-    <div className="flex-1 space-y-1.5">
+    <div className="flex-1 space-y-1.5 min-w-0">
       <div className="flex items-center gap-1.5">
         <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
         <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color }}>
@@ -48,14 +48,18 @@ function RegionColumn({ label, color, region }: { label: string; color: string; 
   );
 }
 
-export default function EvidencePanel({ frame }: { frame: DecisionFrame | null }) {
+export default function EvidencePanel({ frame, isProcessing = false }: { frame: DecisionFrame | null; isProcessing?: boolean }) {
   const lineEv = frame?.evidence?.line ?? null;
   const offLineEv = frame?.evidence?.off_line ?? null;
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-950/40 p-3">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">VLM Evidence</h2>
-      {lineEv && offLineEv ? (
+    <div className="glass-panel p-4">
+      <h2 className="mb-3 font-display text-sm font-semibold tracking-wider text-neutral-300">VLM EVIDENCE</h2>
+      {isProcessing ? (
+        <div className="flex h-full items-center justify-center py-6">
+          <span className="text-sm font-semibold text-neon-cyan animate-pulse">Processing frame via VLM...</span>
+        </div>
+      ) : lineEv && offLineEv ? (
         <div className="flex gap-4">
           <RegionColumn label="A · on-line" color={COLOR_LINE} region={lineEv} />
           <div className="w-px bg-neutral-800" />

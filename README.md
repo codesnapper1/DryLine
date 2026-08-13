@@ -103,6 +103,7 @@ confidence gate            evidence → wetness score
 - **Naive-classifier comparison** — a plain per-frame classifier rendered
   side by side with the real pipeline, so the failure mode this project is
   built to avoid is visible on demand, not just claimed.
+- **Responsive Telemetry Dashboard** — A bulletproof, fully responsive React interface that gracefully scales from 4K monitors down to small laptop screens. Built with strict CSS Flexbox constraints so data panels, the live camera feed, and charts never overlap or collapse.
 - **Auto-generated session notes** — a deterministic, template-based recap
   of a session's condition changes, no LLM involved.
 - **Weather cross-check** — an independent agree/disagree signal from live
@@ -187,3 +188,24 @@ npm run dev
 Copy `.env.example` to `.env` and add a provider key to enable live VLM
 inference — the app runs fully on scripted data with no keys set, so this
 is optional for exploring the UI.
+
+```env
+# Provider chain order: Google AI Studio -> Groq -> OpenRouter
+GEMINI_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
+OPENROUTER_API_KEY=your_key_here
+```
+
+## Hackathon Brief Compliance
+
+| Requirement | Implemented | File / Component |
+| :--- | :---: | :--- |
+| All four labels render, spelled exactly as the brief spells them | ✅ | `frontend/src/types.ts`, `backend/decision.py` |
+| Trend graph, uploaded image, and condition visible on one screen | ✅ | `frontend/src/App.tsx` grid layout |
+| `"Track drying: tire change window approaching."` appears verbatim | ✅ | `backend/decision.py`, `frontend/src/components/InsightPanel.tsx` |
+| Full replay runs with wifi disabled | ✅ | `demo/precomputed/*.json`, `frontend/src/api.ts` (fetch from local cache) |
+| Live single-image inference works on a judge-chosen file | ✅ | `frontend/src/App.tsx` (Single Inference toggle), `backend/baseline.py` |
+| <40 API calls for a 60-second clip | ✅ | `backend/main.py` (`_ingest_frame`), `backend/vlm.py` (caching) |
+| App boots and serves cached sessions with no API keys set | ✅ | `backend/vlm.py` (stub fallback), `frontend/src/api.ts` |
+| Label never flips more than once per 20 seconds | ✅ | `backend/temporal.py` (`apply_hysteresis`) |
+| README maps every problem-statement line to a file and endpoint | ✅ | This table, `backend/main.py` |

@@ -124,31 +124,36 @@ export default function Footer({
   const barColor = ok ? "#22d3ee" : "#ef4444";
 
   return (
-    <div className="flex items-center gap-4 border-t border-neutral-800 px-4 py-2.5">
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-neutral-500">confidence</span>
-        <div className="h-2 w-40 overflow-hidden rounded-full bg-neutral-800">
+    <div className="flex flex-wrap items-center gap-4 border-t border-white/5 bg-black/40 backdrop-blur-md px-6 py-3 relative z-10">
+      <div className="flex items-center gap-2 shrink-0">
+        <span className="font-display text-[10px] uppercase tracking-[0.2em] text-neutral-500">confidence</span>
+        <div className="h-2.5 w-24 sm:w-40 overflow-hidden rounded-full bg-neutral-900 border border-white/5 shadow-inner">
           <div
-            className="h-full rounded-full transition-all"
-            style={{ width: `${pct}%`, backgroundColor: barColor }}
+            className="h-full rounded-full transition-all duration-300 shadow-[0_0_10px_currentColor]"
+            style={{ width: `${pct}%`, backgroundColor: barColor, color: barColor }}
           />
         </div>
-        <span className="text-xs tabular-nums text-neutral-400">{frame ? `${pct}%` : "—"}</span>
+        <span className="font-mono text-xs tabular-nums text-neutral-300 w-10">{frame ? `${pct}%` : "—"}</span>
       </div>
 
-      <ProviderIndicator frame={frame} />
-      <WeatherBadge sessionId={sessionId} />
+      <div className="shrink-0">
+        <ProviderIndicator frame={frame} />
+      </div>
+      
+      <div className="shrink-0">
+        <WeatherBadge sessionId={sessionId} />
+      </div>
 
-      <div className="flex-1" />
+      <div className="flex-1 min-w-[20px]" />
 
       <a
         href={sessionId ? exportCsvUrl(sessionId) : undefined}
         download={sessionId ? `${sessionId}.csv` : undefined}
         aria-disabled={!sessionId}
-        className={`rounded border px-3 py-1.5 text-xs font-medium ${
+        className={`shrink-0 rounded-lg border px-4 py-1.5 text-xs font-medium transition-all duration-300 ${
           sessionId
-            ? "border-neutral-700 text-neutral-300 hover:border-cyan-400 hover:text-cyan-300"
-            : "cursor-not-allowed border-neutral-800 text-neutral-600"
+            ? "border-white/10 text-neutral-300 hover:border-neon-cyan hover:bg-neon-cyan-muted hover:shadow-neon-cyan"
+            : "cursor-not-allowed border-neutral-800/50 text-neutral-600 bg-neutral-900/20"
         }`}
       >
         Export CSV
@@ -156,10 +161,10 @@ export default function Footer({
 
       <button
         onClick={onToggleNaive}
-        className={`rounded border px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-colors ${
+        className={`shrink-0 whitespace-nowrap rounded-lg border px-4 py-1.5 text-xs font-bold uppercase tracking-wider transition-all duration-300 ${
           naiveMode
-            ? "border-amber-500 bg-amber-500/10 text-amber-300"
-            : "border-neutral-700 text-neutral-400 hover:border-neutral-500"
+            ? "border-status-damp bg-status-damp/10 text-status-damp shadow-[0_0_15px_rgba(245,166,35,0.2)]"
+            : "border-white/10 text-neutral-400 hover:border-neutral-500 hover:bg-white/5"
         }`}
       >
         Naive classifier A/B: {naiveMode ? "ON" : "OFF"}

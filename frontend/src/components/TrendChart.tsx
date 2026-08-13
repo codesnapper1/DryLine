@@ -30,16 +30,16 @@ export default function TrendChart({
   });
 
   return (
-    <div className="flex h-full flex-col gap-1">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">Wetness Trend</h2>
+    <div className="flex h-full min-h-0 flex-col gap-1">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="font-display text-sm font-semibold tracking-wider text-neutral-300">WETNESS TREND</h2>
         <div className="flex gap-4 text-xs">
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: COLOR_LINE }} />
+            <span className="inline-block h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: COLOR_LINE, color: COLOR_LINE }} />
             on-line
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-3 border-t-2 border-dashed" style={{ borderColor: COLOR_OFF_LINE }} />
+            <span className="inline-block h-2 w-3 border-t-2 border-dashed shadow-[0_0_8px_currentColor]" style={{ borderColor: COLOR_OFF_LINE, color: COLOR_OFF_LINE }} />
             off-line
           </span>
           {!naiveMode && (
@@ -51,9 +51,9 @@ export default function TrendChart({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 rounded-lg border border-neutral-800 bg-neutral-950/40 p-2">
+      <div className="min-h-0 flex-1 glass-panel p-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 18, right: 16, bottom: 4, left: -12 }}>
+          <ComposedChart data={data} margin={{ top: 24, right: 24, bottom: 20, left: -4 }}>
             <CartesianGrid stroke="#27272a" strokeDasharray="3 3" />
 
             <XAxis
@@ -64,7 +64,7 @@ export default function TrendChart({
               orientation="bottom"
               stroke="#71717a"
               tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              label={{ value: "minutes", position: "insideBottom", offset: -2, fill: "#71717a", fontSize: 10 }}
+              label={{ value: "minutes", position: "bottom", offset: 0, fill: "#71717a", fontSize: 10 }}
             />
             <XAxis
               xAxisId="laps"
@@ -74,7 +74,7 @@ export default function TrendChart({
               orientation="top"
               stroke="#52525b"
               tick={{ fontSize: 11, fill: "#71717a" }}
-              label={{ value: "laps", position: "insideTop", offset: -6, fill: "#52525b", fontSize: 10 }}
+              label={{ value: "laps", position: "top", offset: 0, fill: "#52525b", fontSize: 10 }}
             />
             <YAxis
               domain={[0, 1]}
@@ -113,7 +113,7 @@ export default function TrendChart({
               stroke={COLOR_OFF_LINE}
               strokeWidth={2}
               strokeDasharray="5 4"
-              dot={false}
+              dot={true}
               isAnimationActive={false}
             />
             <Line
@@ -122,7 +122,7 @@ export default function TrendChart({
               dataKey="line"
               stroke={COLOR_LINE}
               strokeWidth={2.5}
-              dot={false}
+              dot={true}
               isAnimationActive={false}
             />
 

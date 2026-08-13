@@ -45,6 +45,7 @@ export interface DecisionFrame {
   raw_w_off_line: number;
   provider: Provider;
   evidence: Record<"line" | "off_line", EvidenceRegion | null>;
+  image_url?: string;
   quality: Record<"line" | "off_line", { laplacian_var: number; mean_luminance: number }>;
 }
 

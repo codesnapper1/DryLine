@@ -7,6 +7,7 @@ Run from inside backend/:
 
 import csv
 import io
+import json
 import tempfile
 import time
 from pathlib import Path
@@ -29,6 +30,7 @@ import summary as summary_mod
 import temporal
 import vlm
 import weather
+import dataset as dataset_mod
 
 app = FastAPI(title="DRYLINE backend")
 
@@ -167,6 +169,16 @@ async def _ingest_frame(session: dict, img: np.ndarray, t: float, single_image: 
         "quality": {name: rois[name]["stats"] for name in rois},
     }
     session["frames"].append(frame_record)
+
+    # Dataset: save on-track and off-track ROI crops as labelled JPEGs.
+    # This runs after frame_record is fully built so displayed_label is available.
+    # Non-fatal — a crop-save failure should never break live inference.
+    try:
+        dataset_mod.save_crops(session["id"], t, rois, frame_record)
+    except Exception as _ds_err:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("dataset save_crops failed: %s", _ds_err)
+
     return frame_record
 
 
@@ -202,6 +214,43 @@ def create_session(body: SessionCreate):
         "config": session["config"],
         "roi_boxes": _roi_boxes(session),
     }
+
+
+class RoiCalibrate(BaseModel):
+    roi_line: tuple[float, float, float, float]
+    roi_off_line: tuple[float, float, float, float]
+
+
+@app.post("/session/{session_id}/roi")
+def calibrate_roi(session_id: str, body: RoiCalibrate):
+    """Update the ROI boxes for a session (e.g. after running calibrate_roi.py).
+    Returns the new boxes and the pixel sizes they would map to on a 1280×720 image.
+    """
+    session = _load_or_404(session_id)
+    session["config"]["roi_line"] = list(body.roi_line)
+    session["config"]["roi_off_line"] = list(body.roi_off_line)
+    store.save_session(session)
+    return {"roi_boxes": _roi_boxes(session)}
+
+
+@app.get("/session/{session_id}/export")
+def export_session(session_id: str):
+    """Export the full session (frames + config) as a JSON file.
+    Useful for committing precomputed sessions to demo/precomputed/.
+    """
+    session = _load_or_404(session_id)
+    payload = {
+        "id": session["id"],
+        "created_at": session["created_at"],
+        "config": session["config"],
+        "frames": session["frames"],
+    }
+    content = json.dumps(payload, indent=2)
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{session_id}.json"'},
+    )
 
 
 @app.post("/session/{session_id}/frame")
@@ -279,9 +328,9 @@ def get_decision(session_id: str):
 
 
 @app.get("/session/{session_id}/summary")
-def get_summary(session_id: str):
+async def get_summary(session_id: str):
     session = _load_or_404(session_id)
-    return {"summary": summary_mod.build_summary(session["frames"])}
+    return {"summary": await summary_mod.build_summary(session["frames"])}
 
 
 @app.get("/session/{session_id}/weather")
@@ -354,4 +403,64 @@ def export_csv(session_id: str):
         content=buf.getvalue(),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{session_id}.csv"'},
+    )
+
+@app.post("/baseline/frame")
+async def post_baseline_frame(session_id: str = Form(""), image: UploadFile = File(...), t: Optional[float] = Form(None)):
+    import baseline
+    t_val = t if t is not None else 0.0
+    img = _decode_image(await image.read())
+    label = await baseline.predict_naive(img, t_val, session_id)
+    return {"label": label}
+
+@app.get("/precomputed")
+def list_precomputed():
+    import glob
+    import os
+    import json
+    
+    out_dir = "../demo/precomputed"
+    clips = glob.glob(os.path.join(out_dir, "*.json"))
+    results = []
+    for c in clips:
+        name = os.path.basename(c).replace(".json", "")
+        results.append(name)
+    return {"clips": results}
+
+@app.get("/precomputed/{clip_name}")
+def get_precomputed(clip_name: str):
+    import os
+    import json
+    out_dir = "../demo/precomputed"
+    path = os.path.join(out_dir, f"{clip_name}.json")
+    if not os.path.exists(path):
+        raise HTTPException(404, "precomputed clip not found")
+    with open(path, "r") as f:
+        return json.load(f)
+
+
+# ── Dataset endpoints ─────────────────────────────────────────────────────────
+
+@app.get("/session/{session_id}/dataset/stats")
+def dataset_stats(session_id: str):
+    """Returns how many labeled crop images have been saved for this session."""
+    _load_or_404(session_id)
+    return dataset_mod.dataset_stats(session_id)
+
+
+@app.get("/session/{session_id}/dataset.zip")
+def download_dataset(session_id: str):
+    """Download the full labeled crop dataset for a session as a ZIP file.
+    Contains line/ and off_line/ image folders plus labels.csv.
+    Returns 404 if no frames have been ingested yet.
+    """
+    _load_or_404(session_id)
+    try:
+        zip_bytes = dataset_mod.build_zip(session_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "no dataset available for this session — ingest at least one frame first")
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="dryline_dataset_{session_id}.zip"'},
     )

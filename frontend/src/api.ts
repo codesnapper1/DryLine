@@ -75,3 +75,86 @@ export async function genPlaceholderFrameBlob(size = { w: 480, h: 320 }): Promis
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("toBlob failed"))), "image/jpeg", 0.9);
   });
 }
+
+export async function listPrecomputed(): Promise<{ clips: string[] }> {
+  const res = await fetch(`${API_BASE}/precomputed`);
+  if (!res.ok) throw new Error(`listPrecomputed failed: ${res.status}`);
+  return res.json();
+}
+
+export async function getPrecomputedSeries(clipName: string): Promise<{ id: string; frames: DecisionFrame[] }> {
+  const res = await fetch(`${API_BASE}/precomputed/${clipName}`);
+  if (!res.ok) throw new Error(`getPrecomputedSeries failed: ${res.status}`);
+  return res.json();
+}
+
+export async function postBaselineFrame(sessionId: string, image: Blob, t: number): Promise<{ label: string }> {
+  const form = new FormData();
+  form.append("session_id", sessionId);
+  form.append("image", image, "frame.jpg");
+  form.append("t", String(t));
+  const res = await fetch(`${API_BASE}/baseline/frame`, { method: "POST", body: form });
+  if (!res.ok) throw new Error(`postBaselineFrame failed: ${res.status}`);
+  return res.json();
+}
+
+export async function calibrateRoi(
+  sessionId: string,
+  roiLine: [number, number, number, number],
+  roiOffLine: [number, number, number, number]
+): Promise<{ roi_boxes: { line: [number, number, number, number]; off_line: [number, number, number, number] } }> {
+  const res = await fetch(`${API_BASE}/session/${sessionId}/roi`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roi_line: roiLine, roi_off_line: roiOffLine }),
+  });
+  if (!res.ok) throw new Error(`calibrateRoi failed: ${res.status}`);
+  return res.json();
+}
+
+export async function postVideo(
+  sessionId: string,
+  video: File,
+  fpsSample = 2.0,
+  onProgress?: (pct: number) => void,
+): Promise<{ frames_ingested: number; t_start: number; t_end: number }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("video", video, video.name);
+    form.append("fps_sample", String(fpsSample));
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}/session/${sessionId}/video`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        reject(new Error(`postVideo failed: ${xhr.status} ${xhr.responseText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("postVideo network error"));
+    xhr.send(form);
+  });
+}
+
+export function exportSessionUrl(sessionId: string): string {
+  return `${API_BASE}/session/${sessionId}/export`;
+}
+
+export function datasetZipUrl(sessionId: string): string {
+  return `${API_BASE}/session/${sessionId}/dataset.zip`;
+}
+
+export async function getDatasetStats(sessionId: string): Promise<{
+  exists: boolean;
+  total_frames?: number;
+  line_crops?: number;
+  off_line_crops?: number;
+  label_distribution?: Record<string, number>;
+}> {
+  const res = await fetch(`${API_BASE}/session/${sessionId}/dataset/stats`);
+  if (!res.ok) throw new Error(`getDatasetStats failed: ${res.status}`);
+  return res.json();
+}

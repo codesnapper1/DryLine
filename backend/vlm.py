@@ -75,19 +75,20 @@ def _predict_stub(session_id: str, t: float, rois: dict, gen_params: dict) -> di
     }
 
 
-# --- provider chain config ----------------------------------------------
+# --- model chain config ----------------------------------------------
 
-PROVIDER_ORDER = ["gemini", "groq", "openrouter"]
+MODEL_CHAIN = [
+    {"name": "gemini-gemma", "provider_type": "gemini", "model_id": "gemma-4-31b-it", "env_key": "GEMINI_API_KEY"},
+    {"name": "groq-llama", "provider_type": "groq", "model_id": "llama-3.2-90b-vision-preview", "env_key": "GROQ_API_KEY"},
+    {"name": "openrouter-qwen", "provider_type": "openrouter", "model_id": "qwen/qwen2.5-vl-72b-instruct", "env_key": "OPENROUTER_API_KEY"},
+]
 
-_ENV_KEYS = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+PROVIDER_ORDER = [m["name"] for m in MODEL_CHAIN]
+_ENV_KEYS = {m["name"]: m["env_key"] for m in MODEL_CHAIN}
+_PROVIDER_TYPES = {m["name"]: m["provider_type"] for m in MODEL_CHAIN}
+_MODEL_IDS = {m["name"]: m["model_id"] for m in MODEL_CHAIN}
 
-# Model IDs drift as providers update their catalogs — check the provider's
-# docs if a call starts failing with a "model not found" style error.
-GEMINI_MODEL = "gemini-2.5-flash"
-GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
-OPENROUTER_MODEL = "meta-llama/llama-3.2-11b-vision-instruct:free"
-
-RETRIES_PER_PROVIDER = 2
+RETRIES_PER_PROVIDER = 3
 BACKOFF_BASE_S = 0.75
 CALL_TIMEOUT_S = 20.0
 RATE_LIMIT_RPM = 20
@@ -226,8 +227,8 @@ def _validate_evidence(ev: dict) -> None:
 
 # --- provider callers: raw REST via httpx, no provider SDKs needed ------
 
-async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
+async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str, model_id: str) -> dict:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent"
     parts = [{"text": prompts.USER}]
     for b64 in anchor_b64s:
         parts.append({"inline_data": {"mime_type": "image/jpeg", "data": b64}})
@@ -237,8 +238,11 @@ async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str)
         "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1},
     }
+    headers = {"x-goog-api-key": api_key}
     async with httpx.AsyncClient(timeout=CALL_TIMEOUT_S) as client:
-        resp = await client.post(url, json=body)
+        resp = await client.post(url, json=body, headers=headers)
+        if not resp.is_success:
+            logger.error(f"Error {resp.status_code} from {url}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
     try:
@@ -249,48 +253,55 @@ async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str)
 
 
 async def _call_openai_compatible(
-    base_url: str, api_key: str, model: str, composite_b64: str, anchor_b64s: list[str]
+    base_url: str, api_key: str, model_id: str, composite_b64: str, anchor_b64s: list[str]
 ) -> dict:
     content = [{"type": "text", "text": prompts.USER}]
     for b64 in anchor_b64s:
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
     content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{composite_b64}"}})
     body = {
-        "model": model,
+        "model": model_id,
         "messages": [
             {"role": "system", "content": prompts.SYSTEM},
             {"role": "user", "content": content},
         ],
-        "response_format": {"type": "json_object"},
         "temperature": 0.1,
+        "max_tokens": 1000,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
     async with httpx.AsyncClient(timeout=CALL_TIMEOUT_S) as client:
         resp = await client.post(f"{base_url}/chat/completions", json=body, headers=headers)
+        if not resp.is_success:
+            logger.error(f"Error {resp.status_code} from {base_url}: {resp.text}")
         resp.raise_for_status()
         data = resp.json()
     try:
         text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as e:
         raise ProviderError(f"unexpected response shape from {base_url}: {e}") from e
+        
+    import re
+    # Strip markdown code blocks if the model wrapped the JSON
+    text = re.sub(r"^```(?:json)?\s*", "", text.strip(), flags=re.MULTILINE)
+    text = re.sub(r"\s*```$", "", text, flags=re.MULTILINE)
+    
     return json.loads(text)
 
 
-async def _call_groq(composite_b64: str, anchor_b64s: list[str], api_key: str) -> dict:
-    return await _call_openai_compatible("https://api.groq.com/openai/v1", api_key, GROQ_MODEL, composite_b64, anchor_b64s)
-
-
-async def _call_openrouter(composite_b64: str, anchor_b64s: list[str], api_key: str) -> dict:
-    return await _call_openai_compatible(
-        "https://openrouter.ai/api/v1", api_key, OPENROUTER_MODEL, composite_b64, anchor_b64s
-    )
-
-
-_CALLERS = {"gemini": _call_gemini, "groq": _call_groq, "openrouter": _call_openrouter}
+async def _call_model(name: str, composite_b64: str, anchor_b64s: list[str], api_key: str) -> dict:
+    ptype = _PROVIDER_TYPES[name]
+    mid = _MODEL_IDS[name]
+    if ptype == "gemini":
+        return await _call_gemini(composite_b64, anchor_b64s, api_key, mid)
+    elif ptype == "openrouter":
+        return await _call_openai_compatible("https://openrouter.ai/api/v1", api_key, mid, composite_b64, anchor_b64s)
+    elif ptype == "groq":
+        return await _call_openai_compatible("https://api.groq.com/openai/v1", api_key, mid, composite_b64, anchor_b64s)
+    raise ValueError(f"unknown provider_type: {ptype}")
 
 
 async def _call_chain(composite_b64: str, anchor_b64s: list[str]) -> tuple[dict, str]:
-    """Tries providers in order (or just the forced one), retrying each with
+    """Tries models in order (or just the forced one), retrying each with
     exponential backoff before failing over to the next. Raises
     AllProvidersFailedError only once every configured provider is exhausted.
     """
@@ -303,14 +314,14 @@ async def _call_chain(composite_b64: str, anchor_b64s: list[str]) -> tuple[dict,
         for attempt in range(RETRIES_PER_PROVIDER):
             try:
                 await _buckets[name].acquire()
-                ev = await _CALLERS[name](composite_b64, anchor_b64s, api_key)
+                ev = await _call_model(name, composite_b64, anchor_b64s, api_key)
                 _validate_evidence(ev)
                 _health[name] = {"last_ok": time.time(), "last_error": None}
                 return ev, name
             except Exception as e:  # noqa: BLE001 — any failure here means "try next", by design
                 last_err = e
                 _health[name] = {"last_ok": _health[name]["last_ok"], "last_error": str(e)}
-                logger.warning("VLM provider %s attempt %d failed: %s", name, attempt + 1, e)
+                logger.warning("VLM model %s attempt %d failed: %s", name, attempt + 1, e)
                 if attempt < RETRIES_PER_PROVIDER - 1:
                     await asyncio.sleep(BACKOFF_BASE_S * (2**attempt))
     raise AllProvidersFailedError(str(last_err) if last_err else "no VLM provider is configured")
