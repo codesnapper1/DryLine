@@ -13,7 +13,7 @@
 import { useRef, useState, useCallback } from "react";
 
 export interface WebcamHook {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  videoRef: React.RefObject<HTMLVideoElement>;
   isActive: boolean;
   error: string | null;
   start: () => Promise<void>;
@@ -22,7 +22,7 @@ export interface WebcamHook {
 }
 
 export function useWebcam(): WebcamHook {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);

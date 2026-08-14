@@ -31,6 +31,15 @@ export default function StatusChip({ frame, naiveMode, baselineLabel, isProcessi
     );
   }
 
+  if (!frame) {
+    return (
+      <div className="glass-panel flex h-full flex-col justify-center gap-2 px-8 py-4 border-l-4 border-l-neutral-600">
+        <span className="font-display text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-500">track telemetry</span>
+        <span className="font-display text-5xl font-black leading-none tracking-tighter text-neutral-200">WAITING</span>
+        <span className="font-mono text-xs text-neutral-500">waiting for the next frame to update the dry/wet state</span>
+      </div>
+    );
+  }
 
   const isLowConf = frame.displayed_label === "LOW_CONFIDENCE";
   const color = isLowConf ? COLOR_STABLE : chipColor(frame);

@@ -52,7 +52,7 @@ export default function FramePanel({
   onUpload: (file: File) => void;
   onVideoUpload: (file: File) => void;
   videoState: VideoUploadState;
-  webcamVideoRef: React.RefObject<HTMLVideoElement | null>;
+  webcamVideoRef: React.RefObject<HTMLVideoElement>;
   webcamActive: boolean;
   webcamError: string | null;
   onWebcamStart: () => void;
