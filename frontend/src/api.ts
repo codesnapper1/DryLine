@@ -83,8 +83,8 @@ export async function listPrecomputed(): Promise<{ clips: string[] }> {
 }
 
 export async function getPrecomputedSeries(clipName: string): Promise<{ id: string; frames: DecisionFrame[] }> {
-  const res = await fetch(`${API_BASE}/precomputed/${clipName}`);
-  if (!res.ok) throw new Error(`getPrecomputedSeries failed: ${res.status}`);
+  const res = await fetch(`${API_BASE}/precomputed/${clipName}?_t=${Date.now()}`);
+  if (!res.ok) throw new Error("Failed to fetch precomputed series");
   return res.json();
 }
 

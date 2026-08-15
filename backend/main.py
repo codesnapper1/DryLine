@@ -16,9 +16,9 @@ from typing import Optional
 import cv2
 import numpy as np
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 load_dotenv()  # populates os.environ from .env before vlm.py ever reads a provider key
@@ -95,7 +95,7 @@ async def _ingest_frame(session: dict, img: np.ndarray, t: float, single_image: 
     for name, r in rois.items():
         confidence_reasons += roi.quality_reasons(name, r["stats"])
 
-    preds = await vlm.predict(session["id"], t, rois, session["config"], single_image=single_image)
+    preds = await vlm.predict(session["id"], t, rois, session["config"], single_image=single_image, full_img=img)
     model_confidence = sum(p["confidence"] for p in preds.values()) / len(preds)
 
     # Total provider outage (every provider in the chain failed): don't feed a
@@ -428,15 +428,22 @@ def list_precomputed():
     return {"clips": results}
 
 @app.get("/precomputed/{clip_name}")
-def get_precomputed(clip_name: str):
-    import os
-    import json
-    out_dir = "../demo/precomputed"
-    path = os.path.join(out_dir, f"{clip_name}.json")
-    if not os.path.exists(path):
-        raise HTTPException(404, "precomputed clip not found")
-    with open(path, "r") as f:
-        return json.load(f)
+def get_precomputed(clip_name: str, response: Response):
+    try:
+        demo_dir = Path(__file__).parent.parent / "demo" / "precomputed"
+        demo_path = demo_dir / clip_name
+        if not demo_path.exists():
+            # /precomputed lists clip names with ".json" stripped — accept that form too.
+            demo_path = demo_dir / f"{clip_name}.json"
+        if not demo_path.exists():
+            raise FileNotFoundError()
+        data = json.loads(demo_path.read_text())
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return data
+    except FileNotFoundError:
+        raise HTTPException(404, "clip not found")
 
 
 # ── Dataset endpoints ─────────────────────────────────────────────────────────

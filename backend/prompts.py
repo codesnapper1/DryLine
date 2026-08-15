@@ -14,13 +14,12 @@ ANCHOR_EXTENSIONS = (".jpg", ".jpeg", ".png")
 
 logger = logging.getLogger(__name__)
 
-SYSTEM = """You are a motorsport track-surface analyst. You will see a composite
-image containing two cropped regions of racing circuit tarmac, labelled A and B.
+SYSTEM = """You are a motorsport track-surface analyst. You will see a full image of a racing circuit tarmac.
 Report ONLY what is visually observable. Output strict JSON. No prose, no markdown."""
 
 USER = """The four reference images above show, in order: DRY, DAMP, WET, STANDING WATER.
 
-Analyse region A (racing line) and region B (off-line) in the target image.
+First, automatically identify the main racing line (Region A) where cars actively drive, and the off-line track area (Region B) where water accumulates, from the target image. Then analyse both regions.
 Return exactly this JSON:
 {
   "A": {
@@ -33,6 +32,15 @@ Return exactly this JSON:
     "confidence_0_100":    <int>
   },
   "B": { ...same fields... },
+  "telemetry": {
+    "track_temp_c": <float (visual estimate based on weather/sun)>,
+    "air_temp_c": <float>,
+    "humidity_pct": <int>,
+    "rain_prob_pct": <int>,
+    "grip_level_pct": <float>,
+    "water_dispersion_needs_ls": <float (estimated liters/sec required)>,
+    "temperature_risk": "HIGH (Cooling)" | "LOW (Stable)"
+  },
   "occluded_or_unclear": true | false,
   "note": "<one short sentence of visual justification>"
 }

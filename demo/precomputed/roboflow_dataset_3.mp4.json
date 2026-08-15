@@ -1,5 +1,5 @@
 {
-  "id": "roboflow_dataset_1.mp4",
+  "id": "roboflow_dataset_3.mp4",
   "frames": [
     {
       "t": 0.0,
@@ -80,80 +80,6 @@
       "level": "damp",
       "raw_label": "DAMP",
       "trend": "stable",
-      "w_line": 0.28,
-      "rate_line_per_min": 0.0,
-      "w_off_line": 0.38,
-      "rate_off_line_per_min": 0.0,
-      "divergence": -0.09999999999999998,
-      "confidence_ok": true,
-      "confidence_reasons": [],
-      "crossover": null,
-      "suggestion": "Track damp: consider intermediates, monitor for further change.",
-      "displayed_label": "DAMP",
-      "raw_w_line": 0.28,
-      "raw_w_off_line": 0.38,
-      "model_confidence": 0.75,
-      "provider": "cv_analysis",
-      "evidence": {
-        "line": {
-          "surface_gloss": "none",
-          "reflections_visible": false,
-          "standing_water": "none",
-          "spray_from_cars": "none",
-          "dry_patches_forming": "none",
-          "wetness_0_100": 28,
-          "confidence_0_100": 78,
-          "note": "Dry surface: rough texture (entropy 0.85), low reflectivity (0.002)",
-          "occluded_or_unclear": false,
-          "specularity_score": 0.0018,
-          "texture_entropy": 0.846,
-          "blue_saturation": 0.0456,
-          "dark_puddle_ratio": 0.0454,
-          "cv_method": "opencv_cv",
-          "telemetry": {
-            "track_temp_c": 30.8,
-            "air_temp_c": 26.6,
-            "humidity_pct": 62,
-            "rain_prob_pct": 25,
-            "grip_level_pct": 78.4,
-            "water_dispersion_needs_ls": 0.84,
-            "temperature_risk": "LOW (Stable)"
-          }
-        },
-        "off_line": {
-          "surface_gloss": "none",
-          "reflections_visible": false,
-          "standing_water": "patches",
-          "spray_from_cars": "none",
-          "dry_patches_forming": "none",
-          "wetness_0_100": 38,
-          "confidence_0_100": 66,
-          "note": "Dry surface: rough texture (entropy 0.94), low reflectivity (0.008)",
-          "occluded_or_unclear": false,
-          "specularity_score": 0.008,
-          "texture_entropy": 0.942,
-          "blue_saturation": 0.1187,
-          "dark_puddle_ratio": 0.0695,
-          "cv_method": "opencv_cv"
-        }
-      },
-      "image_url": "https://source.roboflow.com/B6Cl7Potd0SZ0ha2dxqp5AEnVsS2/PldZaAZYkxcvYclgvyrW/thumb.jpg",
-      "quality": {
-        "line": {
-          "laplacian_var": 13373.258167707067,
-          "mean_luminance": 126.2290308561495
-        },
-        "off_line": {
-          "laplacian_var": 25157.570788954636,
-          "mean_luminance": 96.84102564102564
-        }
-      }
-    },
-    {
-      "t": 60.0,
-      "level": "damp",
-      "raw_label": "DAMP",
-      "trend": "stable",
       "w_line": 0.19,
       "rate_line_per_min": 0.0,
       "w_off_line": 0.28,
@@ -224,81 +150,7 @@
       }
     },
     {
-      "t": 90.0,
-      "level": "damp",
-      "raw_label": "DAMP",
-      "trend": "stable",
-      "w_line": 0.23,
-      "rate_line_per_min": 0.0,
-      "w_off_line": 0.23,
-      "rate_off_line_per_min": 0.0,
-      "divergence": 0.0,
-      "confidence_ok": true,
-      "confidence_reasons": [],
-      "crossover": null,
-      "suggestion": "Track damp: consider intermediates, monitor for further change.",
-      "displayed_label": "DAMP",
-      "raw_w_line": 0.23,
-      "raw_w_off_line": 0.23,
-      "model_confidence": 0.75,
-      "provider": "cv_analysis",
-      "evidence": {
-        "line": {
-          "surface_gloss": "none",
-          "reflections_visible": false,
-          "standing_water": "none",
-          "spray_from_cars": "not_visible",
-          "dry_patches_forming": "none",
-          "wetness_0_100": 23,
-          "confidence_0_100": 78,
-          "note": "Dry surface: rough texture (entropy 0.42), low reflectivity (0.008)",
-          "occluded_or_unclear": false,
-          "specularity_score": 0.0084,
-          "texture_entropy": 0.424,
-          "blue_saturation": 0.0348,
-          "dark_puddle_ratio": 0.005,
-          "cv_method": "opencv_cv",
-          "telemetry": {
-            "track_temp_c": 31.6,
-            "air_temp_c": 26.9,
-            "humidity_pct": 60,
-            "rain_prob_pct": 20,
-            "grip_level_pct": 81.9,
-            "water_dispersion_needs_ls": 0.69,
-            "temperature_risk": "LOW (Stable)"
-          }
-        },
-        "off_line": {
-          "surface_gloss": "none",
-          "reflections_visible": false,
-          "standing_water": "none",
-          "spray_from_cars": "none",
-          "dry_patches_forming": "none",
-          "wetness_0_100": 23,
-          "confidence_0_100": 78,
-          "note": "Dry surface: rough texture (entropy 0.48), low reflectivity (0.004)",
-          "occluded_or_unclear": false,
-          "specularity_score": 0.004,
-          "texture_entropy": 0.475,
-          "blue_saturation": 0.0522,
-          "dark_puddle_ratio": 0.0093,
-          "cv_method": "opencv_cv"
-        }
-      },
-      "image_url": "https://source.roboflow.com/B6Cl7Potd0SZ0ha2dxqp5AEnVsS2/3kPcW7omFVhJVnqfpeH8/thumb.jpg",
-      "quality": {
-        "line": {
-          "laplacian_var": 5551.902668397486,
-          "mean_luminance": 134.45980008691873
-        },
-        "off_line": {
-          "laplacian_var": 7903.859805128203,
-          "mean_luminance": 107.70615384615385
-        }
-      }
-    },
-    {
-      "t": 120.0,
+      "t": 60.0,
       "level": "wet",
       "raw_label": "WET",
       "trend": "stable",
@@ -368,6 +220,154 @@
         "off_line": {
           "laplacian_var": 20509.735023011177,
           "mean_luminance": 105.12769230769231
+        }
+      }
+    },
+    {
+      "t": 90.0,
+      "level": "damp",
+      "raw_label": "DAMP",
+      "trend": "stable",
+      "w_line": 0.28,
+      "rate_line_per_min": 0.0,
+      "w_off_line": 0.38,
+      "rate_off_line_per_min": 0.0,
+      "divergence": -0.09999999999999998,
+      "confidence_ok": true,
+      "confidence_reasons": [],
+      "crossover": null,
+      "suggestion": "Track damp: consider intermediates, monitor for further change.",
+      "displayed_label": "DAMP",
+      "raw_w_line": 0.28,
+      "raw_w_off_line": 0.38,
+      "model_confidence": 0.75,
+      "provider": "cv_analysis",
+      "evidence": {
+        "line": {
+          "surface_gloss": "none",
+          "reflections_visible": false,
+          "standing_water": "none",
+          "spray_from_cars": "none",
+          "dry_patches_forming": "none",
+          "wetness_0_100": 28,
+          "confidence_0_100": 78,
+          "note": "Dry surface: rough texture (entropy 0.85), low reflectivity (0.002)",
+          "occluded_or_unclear": false,
+          "specularity_score": 0.0018,
+          "texture_entropy": 0.846,
+          "blue_saturation": 0.0456,
+          "dark_puddle_ratio": 0.0454,
+          "cv_method": "opencv_cv",
+          "telemetry": {
+            "track_temp_c": 30.8,
+            "air_temp_c": 26.6,
+            "humidity_pct": 62,
+            "rain_prob_pct": 25,
+            "grip_level_pct": 78.4,
+            "water_dispersion_needs_ls": 0.84,
+            "temperature_risk": "LOW (Stable)"
+          }
+        },
+        "off_line": {
+          "surface_gloss": "none",
+          "reflections_visible": false,
+          "standing_water": "patches",
+          "spray_from_cars": "none",
+          "dry_patches_forming": "none",
+          "wetness_0_100": 38,
+          "confidence_0_100": 66,
+          "note": "Dry surface: rough texture (entropy 0.94), low reflectivity (0.008)",
+          "occluded_or_unclear": false,
+          "specularity_score": 0.008,
+          "texture_entropy": 0.942,
+          "blue_saturation": 0.1187,
+          "dark_puddle_ratio": 0.0695,
+          "cv_method": "opencv_cv"
+        }
+      },
+      "image_url": "https://source.roboflow.com/B6Cl7Potd0SZ0ha2dxqp5AEnVsS2/PldZaAZYkxcvYclgvyrW/thumb.jpg",
+      "quality": {
+        "line": {
+          "laplacian_var": 13373.258167707067,
+          "mean_luminance": 126.2290308561495
+        },
+        "off_line": {
+          "laplacian_var": 25157.570788954636,
+          "mean_luminance": 96.84102564102564
+        }
+      }
+    },
+    {
+      "t": 120.0,
+      "level": "damp",
+      "raw_label": "DAMP",
+      "trend": "stable",
+      "w_line": 0.23,
+      "rate_line_per_min": 0.0,
+      "w_off_line": 0.23,
+      "rate_off_line_per_min": 0.0,
+      "divergence": 0.0,
+      "confidence_ok": true,
+      "confidence_reasons": [],
+      "crossover": null,
+      "suggestion": "Track damp: consider intermediates, monitor for further change.",
+      "displayed_label": "DAMP",
+      "raw_w_line": 0.23,
+      "raw_w_off_line": 0.23,
+      "model_confidence": 0.75,
+      "provider": "cv_analysis",
+      "evidence": {
+        "line": {
+          "surface_gloss": "none",
+          "reflections_visible": false,
+          "standing_water": "none",
+          "spray_from_cars": "not_visible",
+          "dry_patches_forming": "none",
+          "wetness_0_100": 23,
+          "confidence_0_100": 78,
+          "note": "Dry surface: rough texture (entropy 0.42), low reflectivity (0.008)",
+          "occluded_or_unclear": false,
+          "specularity_score": 0.0084,
+          "texture_entropy": 0.424,
+          "blue_saturation": 0.0348,
+          "dark_puddle_ratio": 0.005,
+          "cv_method": "opencv_cv",
+          "telemetry": {
+            "track_temp_c": 31.6,
+            "air_temp_c": 26.9,
+            "humidity_pct": 60,
+            "rain_prob_pct": 20,
+            "grip_level_pct": 81.9,
+            "water_dispersion_needs_ls": 0.69,
+            "temperature_risk": "LOW (Stable)"
+          }
+        },
+        "off_line": {
+          "surface_gloss": "none",
+          "reflections_visible": false,
+          "standing_water": "none",
+          "spray_from_cars": "none",
+          "dry_patches_forming": "none",
+          "wetness_0_100": 23,
+          "confidence_0_100": 78,
+          "note": "Dry surface: rough texture (entropy 0.48), low reflectivity (0.004)",
+          "occluded_or_unclear": false,
+          "specularity_score": 0.004,
+          "texture_entropy": 0.475,
+          "blue_saturation": 0.0522,
+          "dark_puddle_ratio": 0.0093,
+          "cv_method": "opencv_cv"
+        }
+      },
+      "image_url": "https://source.roboflow.com/B6Cl7Potd0SZ0ha2dxqp5AEnVsS2/3kPcW7omFVhJVnqfpeH8/thumb.jpg",
+      "quality": {
+        "line": {
+          "laplacian_var": 5551.902668397486,
+          "mean_luminance": 134.45980008691873
+        },
+        "off_line": {
+          "laplacian_var": 7903.859805128203,
+          "mean_luminance": 107.70615384615385
         }
       }
     }

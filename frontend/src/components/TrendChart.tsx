@@ -1,4 +1,7 @@
-import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import {
+  Area, CartesianGrid, ComposedChart, Line,
+  ReferenceLine, ResponsiveContainer, XAxis, YAxis, Tooltip,
+} from "recharts";
 import type { DecisionFrame } from "../types";
 import { COLOR_LINE, COLOR_OFF_LINE } from "../theme";
 
@@ -30,109 +33,105 @@ export default function TrendChart({
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="font-display text-sm font-semibold tracking-wider text-neutral-300">WETNESS TREND</h2>
-        <div className="flex gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: COLOR_LINE, color: COLOR_LINE }} />
-            on-line
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block h-2 w-3 border-t-2 border-dashed shadow-[0_0_8px_currentColor]" style={{ borderColor: COLOR_OFF_LINE, color: COLOR_OFF_LINE }} />
-            off-line
-          </span>
+    <div style={{ width: "100%", height: "100%", padding: "8px 4px 4px 0" }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data} margin={{ top: 16, right: 32, bottom: 20, left: 0 }}>
+          <CartesianGrid stroke="rgba(255,255,255,0.04)" strokeDasharray="3 3" vertical={false} />
+
+          <XAxis
+            xAxisId="minutes"
+            dataKey="minutes"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            orientation="bottom"
+            stroke="rgba(255,255,255,0.1)"
+            tick={{ fontSize: 9, fill: "rgba(255,255,255,0.25)", fontFamily: "JetBrains Mono, monospace" }}
+            tickLine={false}
+            axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+            label={{ value: "minutes", position: "insideBottomRight", offset: -4, fill: "rgba(255,255,255,0.15)", fontSize: 8 }}
+          />
+          <XAxis
+            xAxisId="laps"
+            dataKey="laps"
+            type="number"
+            domain={["dataMin", "dataMax"]}
+            orientation="top"
+            stroke="rgba(255,255,255,0.05)"
+            tick={{ fontSize: 9, fill: "rgba(255,255,255,0.2)", fontFamily: "JetBrains Mono, monospace" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            domain={[0, 1]}
+            stroke="rgba(255,255,255,0.05)"
+            tick={{ fontSize: 9, fill: "rgba(255,255,255,0.2)", fontFamily: "JetBrains Mono, monospace" }}
+            width={28}
+            tickLine={false}
+            axisLine={false}
+          />
+
+          {LEVEL_LINES.map(([y, label]) => (
+            <ReferenceLine
+              key={y}
+              xAxisId="minutes"
+              y={y}
+              stroke="rgba(255,255,255,0.06)"
+              strokeDasharray="2 5"
+              label={{ value: label, position: "insideRight", fill: "rgba(255,255,255,0.2)", fontSize: 8 }}
+            />
+          ))}
+
           {!naiveMode && (
-            <span className="flex items-center gap-1.5 text-neutral-500">
-              <span className="inline-block h-2 w-3 rounded bg-neutral-600/50" />
-              confidence band
-            </span>
+            <Area
+              xAxisId="minutes"
+              dataKey="band"
+              stroke="none"
+              fill="rgba(0,229,255,0.06)"
+              fillOpacity={1}
+              isAnimationActive={false}
+            />
           )}
-        </div>
-      </div>
 
-      <div className="min-h-0 flex-1 glass-panel p-2">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 24, right: 24, bottom: 20, left: -4 }}>
-            <CartesianGrid stroke="#27272a" strokeDasharray="3 3" />
+          <Line
+            xAxisId="minutes"
+            type="monotone"
+            dataKey="offLine"
+            stroke={COLOR_OFF_LINE}
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            dot={false}
+            isAnimationActive={false}
+          />
+          <Line
+            xAxisId="minutes"
+            type="monotone"
+            dataKey="line"
+            stroke={COLOR_LINE}
+            strokeWidth={2.5}
+            dot={false}
+            isAnimationActive={false}
+            style={{ filter: `drop-shadow(0 0 4px ${COLOR_LINE}88)` }}
+          />
 
-            <XAxis
-              xAxisId="minutes"
-              dataKey="minutes"
-              type="number"
-              domain={["dataMin", "dataMax"]}
-              orientation="bottom"
-              stroke="#71717a"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              label={{ value: "minutes", position: "bottom", offset: 0, fill: "#71717a", fontSize: 10 }}
-            />
-            <XAxis
-              xAxisId="laps"
-              dataKey="laps"
-              type="number"
-              domain={["dataMin", "dataMax"]}
-              orientation="top"
-              stroke="#52525b"
-              tick={{ fontSize: 11, fill: "#71717a" }}
-              label={{ value: "laps", position: "top", offset: 0, fill: "#52525b", fontSize: 10 }}
-            />
-            <YAxis
-              domain={[0, 1]}
-              stroke="#71717a"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              width={36}
-              label={{ value: "Ŵ", angle: -90, position: "insideLeft", fill: "#71717a", fontSize: 11 }}
-            />
-
-            {LEVEL_LINES.map(([y, label]) => (
-              <ReferenceLine
-                key={y}
-                xAxisId="minutes"
-                y={y}
-                stroke="#3f3f46"
-                strokeDasharray="2 4"
-                label={{ value: label, position: "right", fill: "#52525b", fontSize: 9 }}
-              />
-            ))}
-
-            {!naiveMode && (
-              <Area
-                xAxisId="minutes"
-                dataKey="band"
-                stroke="none"
-                fill="#71717a"
-                fillOpacity={0.18}
-                isAnimationActive={false}
-              />
-            )}
-
-            <Line
-              xAxisId="minutes"
-              type="monotone"
-              dataKey="offLine"
-              stroke={COLOR_OFF_LINE}
-              strokeWidth={2}
-              strokeDasharray="5 4"
-              dot={true}
-              isAnimationActive={false}
-            />
-            <Line
-              xAxisId="minutes"
-              type="monotone"
-              dataKey="line"
-              stroke={COLOR_LINE}
-              strokeWidth={2.5}
-              dot={true}
-              isAnimationActive={false}
-            />
-
-            <Tooltip
-              contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", fontSize: 12 }}
-              labelFormatter={(v) => `t=${v}min`}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+          <Tooltip
+            contentStyle={{
+              background: "#0f1115",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 4,
+              fontSize: 10,
+              fontFamily: "JetBrains Mono, monospace",
+              color: "rgba(255,255,255,0.7)",
+            }}
+            labelStyle={{ color: "rgba(255,255,255,0.4)", marginBottom: 4 }}
+            labelFormatter={(v) => `t = ${typeof v === "number" ? v.toFixed(2) : v} min`}
+            formatter={(v: unknown, name: string) => {
+              const num = typeof v === "number" ? v : (Array.isArray(v) ? v[0] : NaN);
+              const display = typeof num === "number" && !isNaN(num) ? num.toFixed(3) : "—";
+              return [display, name === "line" ? "on-line" : "off-line"];
+            }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 }

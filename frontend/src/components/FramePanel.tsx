@@ -1,31 +1,4 @@
 import { useRef, useState } from "react";
-import type { RoiBox } from "../types";
-import { COLOR_LINE, COLOR_OFF_LINE } from "../theme";
-
-function RoiOverlay({ box, color, label }: { box: RoiBox; color: string; label: string }) {
-  const [x, y, w, h] = box;
-  return (
-    <div
-      className="absolute flex items-start justify-start"
-      style={{
-        left: `${x * 100}%`,
-        top: `${y * 100}%`,
-        width: `${w * 100}%`,
-        height: `${h * 100}%`,
-        border: `2px solid ${color}`,
-        backgroundColor: `${color}22`,
-        boxShadow: `0 0 12px ${color}55 inset`,
-      }}
-    >
-      <span
-        className="-translate-y-1/2 translate-x-2 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-widest text-black"
-        style={{ backgroundColor: color }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
 
 export type VideoUploadState =
   | { status: "idle" }
@@ -36,19 +9,17 @@ export type VideoUploadState =
 
 export default function FramePanel({
   imageUrl,
-  roiBoxes,
   onUpload,
   onVideoUpload,
   videoState,
-  // Webcam props — passed from App.tsx which owns the useWebcam hook
   webcamVideoRef,
   webcamActive,
   webcamError,
   onWebcamStart,
   onWebcamStop,
+  simTimeStr,
 }: {
   imageUrl: string | null;
-  roiBoxes: { line: RoiBox; off_line: RoiBox } | null;
   onUpload: (file: File) => void;
   onVideoUpload: (file: File) => void;
   videoState: VideoUploadState;
@@ -57,13 +28,13 @@ export default function FramePanel({
   webcamError: string | null;
   onWebcamStart: () => void;
   onWebcamStop: () => void;
+  simTimeStr?: string;
 }) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   const isVideoBusy = videoState.status === "uploading" || videoState.status === "processing";
-  // Show webcam feed if active (takes priority over uploaded image)
   const showWebcam = webcamActive;
   const showImage = !webcamActive && !!imageUrl;
 
@@ -72,157 +43,190 @@ export default function FramePanel({
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
-    if (file.type.startsWith("video/")) {
-      onVideoUpload(file);
-    } else if (file.type.startsWith("image/")) {
-      onUpload(file);
-    }
+    if (file.type.startsWith("video/")) onVideoUpload(file);
+    else if (file.type.startsWith("image/")) onUpload(file);
   }
 
   return (
-    <div className="glass-panel flex h-full min-h-0 flex-col p-4 shadow-panel">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="font-display text-sm font-semibold tracking-wider text-neutral-300">
-          CAMERA FRAME
-        </h2>
-        <div className="flex gap-1.5">
-          {/* Webcam button */}
+    <div className="cam-panel">
+      {/* Camera header */}
+      <div className="cam-header">
+        <div className="cam-info-left">
+          <span className="cam-label">SECTOR 2 APEX CAM</span>
+          <span className="cam-timestamp">{simTimeStr ?? "T00:00:00.00Z"}</span>
+        </div>
+        <div className="cam-controls">
           {!webcamActive ? (
             <button
               onClick={onWebcamStart}
               disabled={isVideoBusy}
+              className="cam-btn"
               title="Start live webcam"
-              className="flex items-center gap-1 rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-neutral-300 hover:border-emerald-400 hover:text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              Webcam
+              ⬤ Webcam
             </button>
           ) : (
-            <button
-              onClick={onWebcamStop}
-              title="Stop webcam"
-              className="flex items-center gap-1 rounded border border-red-700 bg-red-950/40 px-2 py-1 text-xs font-medium text-red-400 hover:border-red-400 hover:text-red-300"
-            >
+            <button onClick={onWebcamStop} className="cam-btn danger" title="Stop webcam">
               ■ Stop
             </button>
           )}
-
-          {/* Image upload */}
           <button
             onClick={() => imageInputRef.current?.click()}
             disabled={isVideoBusy || webcamActive}
-            className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-neutral-300 hover:border-cyan-400 hover:text-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cam-btn"
+            title="Upload image"
           >
             📷 Image
           </button>
-
-          {/* Video upload */}
           <button
             onClick={() => videoInputRef.current?.click()}
             disabled={isVideoBusy || webcamActive}
-            className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-neutral-300 hover:border-violet-400 hover:text-violet-300 disabled:cursor-not-allowed disabled:opacity-40"
+            className="cam-btn"
+            title="Upload video"
           >
             🎬 Video
           </button>
         </div>
 
-        <input ref={imageInputRef} type="file" accept="image/*" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }} />
-        <input ref={videoInputRef} type="file" accept="video/*" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onVideoUpload(f); e.target.value = ""; }} />
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ""; }}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          style={{ display: "none" }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) onVideoUpload(f); e.target.value = ""; }}
+        />
       </div>
 
-      {/* Frame area */}
+      {/* Camera body */}
       <div
-        className={`relative flex-1 overflow-hidden rounded-xl border transition-all duration-300 ${
-          dragging ? "border-neon-purple shadow-[0_0_20px_rgba(176,38,255,0.2)_inset]" : webcamActive ? "border-neon-cyan shadow-[0_0_20px_rgba(0,240,255,0.2)_inset]" : "border-white/10 shadow-[0_0_30px_rgba(0,0,0,0.8)_inset]"
-        }`}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        className="cam-body"
+        onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
+        style={{
+          outline: dragging ? "2px solid rgba(167,139,250,0.6)" : webcamActive ? "1px solid rgba(0,229,255,0.3)" : "none",
+        }}
       >
-        {/* Webcam live preview — always rendered so the ref attaches, hidden when inactive */}
+        {/* Webcam */}
         <video
           ref={webcamVideoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`h-full w-full object-cover ${showWebcam ? "block" : "hidden"}`}
+          autoPlay playsInline muted
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            objectFit: "cover", display: showWebcam ? "block" : "none",
+          }}
         />
 
-        {/* Static uploaded image */}
+        {/* Uploaded image */}
         {showImage && (
-          <img src={imageUrl!} alt="uploaded trackside frame" className="h-full w-full object-cover" />
+          <img
+            src={imageUrl!}
+            alt="trackside frame"
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
         )}
 
         {/* Placeholder */}
-        {!showWebcam && !showImage && <div className="track-placeholder h-full w-full" />}
+        {!showWebcam && !showImage && <div className="track-placeholder" style={{ position: "absolute", inset: 0 }} />}
 
-        {/* ROI overlays */}
-        {roiBoxes && (
-          <>
-            <RoiOverlay box={roiBoxes.line} color={COLOR_LINE} label="ON-LINE" />
-            <RoiOverlay box={roiBoxes.off_line} color={COLOR_OFF_LINE} label="OFF-LINE" />
-          </>
-        )}
-
-        {/* Drag hint */}
-        {dragging && (
-          <div className="absolute inset-0 flex items-center justify-center bg-violet-950/40 backdrop-blur-sm">
-            <p className="text-sm font-semibold text-violet-300">Drop image or video here</p>
+        {/* AI Auto-Tracking badge */}
+        {(showWebcam || showImage) && (
+          <div style={{
+            position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)",
+            background: "rgba(0,0,0,0.8)", borderRadius: 4, padding: "4px 10px",
+            border: "1px solid var(--cyan)", boxShadow: "0 0 10px rgba(0,229,255,0.2)",
+            display: "flex", alignItems: "center", gap: 6,
+            fontFamily: "JetBrains Mono, monospace", fontSize: 10,
+            fontWeight: 700, letterSpacing: "0.1em", color: "var(--cyan)", textTransform: "uppercase",
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+            </svg>
+            AI AUTO-TRACKING
           </div>
         )}
 
         {/* Webcam LIVE badge */}
         {webcamActive && (
-          <div className="absolute left-2 top-2 flex items-center gap-1.5 rounded bg-black/70 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
+          <div style={{
+            position: "absolute", top: 8, left: 8,
+            display: "flex", alignItems: "center", gap: 5,
+            background: "rgba(0,0,0,0.75)", padding: "3px 8px", borderRadius: 3,
+            fontFamily: "JetBrains Mono, monospace", fontSize: 9, fontWeight: 700,
+            letterSpacing: "0.1em", color: "#22c55e", textTransform: "uppercase",
+          }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: "50%", background: "#22c55e",
+              boxShadow: "0 0 6px #22c55e", display: "inline-block",
+              animation: "pulse-rec 1.2s ease-in-out infinite",
+            }} />
             Live
+          </div>
+        )}
+
+        {/* No feed badge */}
+        {!showWebcam && !showImage && !isVideoBusy && videoState.status === "idle" && (
+          <div style={{
+            position: "absolute", bottom: 6, right: 8,
+            fontFamily: "JetBrains Mono, monospace", fontSize: 9,
+            letterSpacing: "0.08em", color: "var(--text-dim)",
+            textTransform: "uppercase",
+          }}>
+            no live feed — simulated
+          </div>
+        )}
+
+        {/* Drag hint */}
+        {dragging && (
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(167,139,250,0.1)", backdropFilter: "blur(4px)",
+          }}>
+            <p style={{ color: "#a78bfa", fontSize: 13, fontWeight: 600 }}>Drop image or video here</p>
           </div>
         )}
 
         {/* Webcam error */}
         {webcamError && (
-          <div className="absolute inset-x-2 bottom-2 rounded bg-red-900/80 px-2 py-1.5 text-[11px] text-red-300">
+          <div style={{
+            position: "absolute", bottom: 8, left: 8, right: 8,
+            background: "rgba(127,29,29,0.9)", borderRadius: 3, padding: "5px 10px",
+            fontSize: 11, color: "#fca5a5",
+          }}>
             ⚠ {webcamError}
-          </div>
-        )}
-
-        {/* Simulated badge */}
-        {!showWebcam && !showImage && !isVideoBusy && videoState.status === "idle" && (
-          <div className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-1 text-[10px] uppercase tracking-widest text-neutral-400">
-            no live feed — simulated
           </div>
         )}
 
         {/* Video upload overlay */}
         {isVideoBusy && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/75 backdrop-blur-sm">
+          <div style={{
+            position: "absolute", inset: 0,
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12,
+            background: "rgba(0,0,0,0.78)", backdropFilter: "blur(4px)",
+          }}>
             {videoState.status === "uploading" ? (
               <>
-                <p className="text-sm font-semibold text-violet-300">Uploading video…</p>
-                <div className="w-48 overflow-hidden rounded-full bg-neutral-800">
-                  <div
-                    className="h-2 rounded-full bg-violet-500 transition-all duration-300"
-                    style={{ width: `${videoState.pct}%` }}
-                  />
+                <p style={{ color: "#a78bfa", fontWeight: 600, fontSize: 13 }}>Uploading video…</p>
+                <div style={{ width: 160, height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${videoState.pct}%`, background: "#a78bfa", borderRadius: 2, transition: "width 0.3s" }} />
                 </div>
-                <p className="text-xs text-neutral-400">{videoState.pct}%</p>
+                <p style={{ color: "var(--text-dim)", fontSize: 11 }}>{videoState.pct}%</p>
               </>
             ) : (
               <>
-                <svg className="h-6 w-6 animate-spin text-violet-400" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                <svg style={{ width: 24, height: 24, animation: "spin 1s linear infinite", color: "#a78bfa" }} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2"/>
+                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
                 </svg>
-                <p className="text-sm font-semibold text-violet-300">Processing frames…</p>
-                <p className="text-xs text-neutral-400">backend is running VLM on each frame</p>
+                <p style={{ color: "#a78bfa", fontWeight: 600, fontSize: 13 }}>Processing frames…</p>
               </>
             )}
           </div>
@@ -230,14 +234,23 @@ export default function FramePanel({
 
         {/* Done badge */}
         {videoState.status === "done" && (
-          <div className="absolute bottom-2 left-2 rounded bg-emerald-900/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-widest text-emerald-300">
+          <div style={{
+            position: "absolute", bottom: 8, left: 8,
+            background: "rgba(6,78,59,0.9)", borderRadius: 3, padding: "3px 8px",
+            fontFamily: "JetBrains Mono, monospace", fontSize: 9,
+            fontWeight: 700, letterSpacing: "0.08em", color: "#6ee7b7", textTransform: "uppercase",
+          }}>
             ✓ {videoState.framesIngested} frames ingested
           </div>
         )}
 
         {/* Error badge */}
         {videoState.status === "error" && (
-          <div className="absolute bottom-2 left-2 right-2 rounded bg-red-900/80 px-2 py-1 text-[10px] text-red-300">
+          <div style={{
+            position: "absolute", bottom: 8, left: 8, right: 8,
+            background: "rgba(127,29,29,0.9)", borderRadius: 3, padding: "4px 10px",
+            fontSize: 10, color: "#fca5a5",
+          }}>
             ✗ {videoState.message}
           </div>
         )}

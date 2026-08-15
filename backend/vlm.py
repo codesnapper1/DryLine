@@ -32,6 +32,7 @@ import numpy as np
 import decision
 import prompts
 import roi as roi_mod
+import cv_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -62,25 +63,39 @@ def scripted_w(session_id: str, roi_name: str, t: float, params: dict) -> float:
 
 
 def _predict_stub(session_id: str, t: float, rois: dict, gen_params: dict) -> dict[str, dict]:
-    return {
-        name: {
-            "w": scripted_w(session_id, name, t, gen_params),
+    """Stub mode: uses OpenCV computer vision analysis instead of an LLM.
+    This runs real pixel-level analysis — specularity, texture entropy,
+    puddle detection — so the EvidencePanel always shows real data.
+    """
+    cv_results = cv_analysis.analyze_frame(rois)
+    out = {}
+    for name in rois:
+        w = scripted_w(session_id, name, t, gen_params)
+        cv = cv_results.get(name, {})
+        # Override wetness from the CV analysis if it has a crop to analyze
+        if cv and not cv.get("occluded_or_unclear"):
+            cv_w = cv["wetness_0_100"] / 100.0
+            # Blend scripted w (smooth arc) with CV measurement for consistency
+            w = 0.6 * w + 0.4 * cv_w
+        evidence = dict(cv) if cv else None
+        out[name] = {
+            "w": float(np.clip(w, 0.0, 1.0)),
             "confidence": STUB_CONFIDENCE,
-            "occluded": False,
+            "occluded": bool(cv.get("occluded_or_unclear", False)) if cv else False,
             "spread": None,
             "provider": "stub",
-            "evidence": None,  # no VLM ran; nothing for an evidence panel to show
+            "evidence": evidence,
         }
-        for name in rois
-    }
+    return out
 
 
 # --- model chain config ----------------------------------------------
 
 MODEL_CHAIN = [
-    {"name": "gemini-gemma", "provider_type": "gemini", "model_id": "gemma-4-31b-it", "env_key": "GEMINI_API_KEY"},
-    {"name": "groq-llama", "provider_type": "groq", "model_id": "llama-3.2-90b-vision-preview", "env_key": "GROQ_API_KEY"},
-    {"name": "openrouter-qwen", "provider_type": "openrouter", "model_id": "qwen/qwen2.5-vl-72b-instruct", "env_key": "OPENROUTER_API_KEY"},
+    # gemini-3.1-flash-lite: verified working, fast, great for structured JSON output
+    {"name": "gemini-3.1-flash-lite", "provider_type": "gemini", "model_id": "gemini-3.1-flash-lite", "env_key": "GEMINI_API_KEY"},
+    # gemini-3.5-flash: fallback
+    {"name": "gemini-3.5-flash", "provider_type": "gemini", "model_id": "gemini-3.5-flash", "env_key": "GEMINI_API_KEY"},
 ]
 
 PROVIDER_ORDER = [m["name"] for m in MODEL_CHAIN]
@@ -88,10 +103,10 @@ _ENV_KEYS = {m["name"]: m["env_key"] for m in MODEL_CHAIN}
 _PROVIDER_TYPES = {m["name"]: m["provider_type"] for m in MODEL_CHAIN}
 _MODEL_IDS = {m["name"]: m["model_id"] for m in MODEL_CHAIN}
 
-RETRIES_PER_PROVIDER = 3
-BACKOFF_BASE_S = 0.75
-CALL_TIMEOUT_S = 20.0
-RATE_LIMIT_RPM = 20
+RETRIES_PER_PROVIDER = 1  # fast fail — if model is down move to next immediately
+BACKOFF_BASE_S = 0.5
+CALL_TIMEOUT_S = 25.0
+RATE_LIMIT_RPM = 10  # stay well within 5 RPM hard limit per model
 
 MIN_MODEL_CONFIDENCE = 0.5
 SELF_CONSISTENCY_SPREAD_MAX = 0.15
@@ -125,8 +140,27 @@ _health: dict[str, dict] = {name: {"last_ok": None, "last_error": None} for name
 _forced_provider: str | None = None
 
 
+def _keys_for(base_env: str) -> list[str]:
+    """All API keys configured for a base env var name, in order:
+    BASE, BASE_2, BASE_3, ... Lets one provider (e.g. Gemini) round-robin
+    across several keys so one key's rate limit / daily quota doesn't stall
+    the whole provider — each key has its own quota bucket upstream."""
+    keys = []
+    first = os.environ.get(base_env)
+    if first:
+        keys.append(first)
+    i = 2
+    while True:
+        v = os.environ.get(f"{base_env}_{i}")
+        if not v:
+            break
+        keys.append(v)
+        i += 1
+    return keys
+
+
 def configured_providers() -> list[str]:
-    return [n for n in PROVIDER_ORDER if os.environ.get(_ENV_KEYS[n])]
+    return [n for n in PROVIDER_ORDER if _keys_for(_ENV_KEYS[n])]
 
 
 def any_provider_configured() -> bool:
@@ -137,7 +171,8 @@ def get_provider_status() -> list[dict]:
     return [
         {
             "name": n,
-            "configured": bool(os.environ.get(_ENV_KEYS[n])),
+            "configured": bool(_keys_for(_ENV_KEYS[n])),
+            "key_count": len(_keys_for(_ENV_KEYS[n])),
             "forced": n == _forced_provider,
             "last_ok": _health[n]["last_ok"],
             "last_error": _health[n]["last_error"],
@@ -178,7 +213,15 @@ class _TokenBucket:
                 await asyncio.sleep((1 - self.tokens) / self.rate)
 
 
-_buckets = {name: _TokenBucket(RATE_LIMIT_RPM) for name in PROVIDER_ORDER}
+def _bucket_capacity(name: str) -> float:
+    # Each extra key is a separate upstream quota, so the local throttle can
+    # scale with however many keys are actually configured for this model.
+    n_keys = max(1, len(_keys_for(_ENV_KEYS[name])))
+    return RATE_LIMIT_RPM * n_keys
+
+
+_buckets = {name: _TokenBucket(_bucket_capacity(name)) for name in PROVIDER_ORDER}
+_key_rr: dict[str, int] = {name: 0 for name in PROVIDER_ORDER}
 
 
 # --- perceptual-hash cache -----------------------------------------------
@@ -223,6 +266,7 @@ def _validate_evidence(ev: dict) -> None:
             raise ProviderError(f"region {region} missing fields {sorted(missing)}")
     if "occluded_or_unclear" not in ev:
         raise ProviderError("evidence missing occluded_or_unclear")
+    # telemetry is optional — some models skip it; we'll generate it from CV analysis if absent
 
 
 # --- provider callers: raw REST via httpx, no provider SDKs needed ------
@@ -236,7 +280,11 @@ async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str,
     body = {
         "system_instruction": {"parts": [{"text": prompts.SYSTEM}]},
         "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {"response_mime_type": "application/json", "temperature": 0.1},
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1,
+            "maxOutputTokens": 1500,
+        },
     }
     headers = {"x-goog-api-key": api_key}
     async with httpx.AsyncClient(timeout=CALL_TIMEOUT_S) as client:
@@ -246,7 +294,19 @@ async def _call_gemini(composite_b64: str, anchor_b64s: list[str], api_key: str,
         resp.raise_for_status()
         data = resp.json()
     try:
-        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        candidate = data["candidates"][0]
+        # Some thinking models return empty content on MAX_TOKENS
+        if candidate.get("finishReason") == "MAX_TOKENS" and not candidate.get("content"):
+            raise ProviderError(f"gemini {model_id} hit token limit with empty response — increase maxOutputTokens or use a smaller model")
+        parts_list = candidate["content"]["parts"]
+        # Find the first part that has actual text (not just thoughtSignature)
+        text = None
+        for part in parts_list:
+            if "text" in part and part["text"].strip():
+                text = part["text"]
+                break
+        if text is None:
+            raise ProviderError(f"gemini {model_id}: no text part found in response")
     except (KeyError, IndexError) as e:
         raise ProviderError(f"unexpected gemini response shape: {e}") from e
     return json.loads(text)
@@ -300,17 +360,20 @@ async def _call_model(name: str, composite_b64: str, anchor_b64s: list[str], api
     raise ValueError(f"unknown provider_type: {ptype}")
 
 
-async def _call_chain(composite_b64: str, anchor_b64s: list[str]) -> tuple[dict, str]:
-    """Tries models in order (or just the forced one), retrying each with
-    exponential backoff before failing over to the next. Raises
-    AllProvidersFailedError only once every configured provider is exhausted.
-    """
-    order = [_forced_provider] if _forced_provider else PROVIDER_ORDER
+async def _call_model_with_retries(name: str, composite_b64: str, anchor_b64s: list[str]) -> tuple[dict, str]:
+    keys = _keys_for(_ENV_KEYS[name])
+    if not keys:
+        raise ProviderError(f"provider {name} not configured")
+
+    # Round-robin the starting key across calls so load spreads evenly
+    # instead of hammering key #1 until it's rate-limited before key #2
+    # is ever touched.
+    start = _key_rr[name] % len(keys)
+    _key_rr[name] = (_key_rr[name] + 1) % len(keys)
+    ordered_keys = keys[start:] + keys[:start]
+
     last_err: Exception | None = None
-    for name in order:
-        api_key = os.environ.get(_ENV_KEYS[name])
-        if not api_key:
-            continue
+    for key_idx, api_key in enumerate(ordered_keys):
         for attempt in range(RETRIES_PER_PROVIDER):
             try:
                 await _buckets[name].acquire()
@@ -318,13 +381,52 @@ async def _call_chain(composite_b64: str, anchor_b64s: list[str]) -> tuple[dict,
                 _validate_evidence(ev)
                 _health[name] = {"last_ok": time.time(), "last_error": None}
                 return ev, name
-            except Exception as e:  # noqa: BLE001 — any failure here means "try next", by design
+            except Exception as e:  # noqa: BLE001
                 last_err = e
                 _health[name] = {"last_ok": _health[name]["last_ok"], "last_error": str(e)}
-                logger.warning("VLM model %s attempt %d failed: %s", name, attempt + 1, e)
+                logger.warning("VLM model %s key #%d/%d attempt %d failed: %s", name, key_idx + 1, len(ordered_keys), attempt + 1, e)
+                # A 429 means this specific key is rate-limited/quota-exhausted —
+                # retrying it won't help, move straight to the next key.
+                if "429" in str(e):
+                    break
                 if attempt < RETRIES_PER_PROVIDER - 1:
                     await asyncio.sleep(BACKOFF_BASE_S * (2**attempt))
-    raise AllProvidersFailedError(str(last_err) if last_err else "no VLM provider is configured")
+    raise ProviderError(f"{name} failed after retries across {len(keys)} key(s): {last_err}")
+
+
+async def _call_chain(composite_b64: str, anchor_b64s: list[str]) -> tuple[dict, str]:
+    """Tries models concurrently in batches (or just the forced one).
+    Races the models using FIRST_COMPLETED. Once a model succeeds, the other
+    slower models in the batch are cancelled to save time and resources.
+    Raises AllProvidersFailedError only once every configured provider is exhausted.
+    """
+    import random
+    
+    if _forced_provider:
+        order = [_forced_provider]
+    else:
+        order = configured_providers()
+        
+    if not order:
+        raise AllProvidersFailedError("no VLM provider is configured")
+        
+    last_err: Exception | None = None
+    tasks = [asyncio.create_task(_call_model_with_retries(name, composite_b64, anchor_b64s)) for name in order]
+    
+    while tasks:
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for t in done:
+            try:
+                ev, name = t.result()
+                # Success! Cancel all other pending tasks.
+                for p in pending:
+                    p.cancel()
+                return ev, name
+            except Exception as e:
+                last_err = e
+        tasks = list(pending)
+        
+    raise AllProvidersFailedError(str(last_err) if last_err else "all VLM providers failed")
 
 
 # --- self-consistency aggregation ----------------------------------------
@@ -355,17 +457,17 @@ def _aggregate(samples: list[dict]) -> dict[str, dict]:
                 **representative[region_key],
                 "note": representative.get("note", ""),
                 "occluded_or_unclear": representative.get("occluded_or_unclear", False),
+                "telemetry": representative.get("telemetry", None),
             },
         }
     return out
 
 
-async def _predict_real(session_id: str, t: float, rois: dict, single_image: bool) -> dict[str, dict]:
-    composite = roi_mod.build_composite(rois)
-    composite_b64 = _encode_b64_jpeg(composite)
+async def _predict_real(session_id: str, t: float, rois: dict, single_image: bool, full_img: np.ndarray) -> dict[str, dict]:
+    composite_b64 = _encode_b64_jpeg(full_img)
     anchor_b64s = [base64.b64encode(b).decode("ascii") for b in prompts.load_anchor_bytes()]
 
-    cache_key = _dhash(composite)
+    cache_key = _dhash(full_img)
     n_samples = SELF_CONSISTENCY_SAMPLES if single_image else 1
 
     samples: list[dict] = []
@@ -408,11 +510,12 @@ async def predict(
     rois: dict[str, dict],
     gen_params: dict,
     single_image: bool = False,
+    full_img: np.ndarray | None = None,
 ) -> dict[str, dict]:
     if not any_provider_configured():
         return _predict_stub(session_id, t, rois, gen_params)
     try:
-        return await _predict_real(session_id, t, rois, single_image)
+        return await _predict_real(session_id, t, rois, single_image, full_img)
     except AllProvidersFailedError as e:
         logger.error("all VLM providers failed: %s", e)
         return {

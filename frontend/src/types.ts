@@ -23,6 +23,21 @@ export interface EvidenceRegion {
   confidence_0_100: number;
   note: string;
   occluded_or_unclear: boolean;
+  // CV analysis extra fields (always present when cv_method = "opencv_cv")
+  cv_method?: string;
+  specularity_score?: number;
+  texture_entropy?: number;
+  blue_saturation?: number;
+  dark_puddle_ratio?: number;
+  telemetry?: {
+    track_temp_c: number;
+    air_temp_c: number;
+    humidity_pct: number;
+    rain_prob_pct: number;
+    grip_level_pct: number;
+    water_dispersion_needs_ls: number;
+    temperature_risk: string;
+  };
 }
 
 export interface DecisionFrame {
