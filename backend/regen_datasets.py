@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 
-import prompts, vlm, cv_analysis, decision, roi as roi_mod
+import prompts, vlm, cv_analysis, decision, roi as roi_mod, temporal
 
 # These are real Roboflow images from the track dataset
 ROBOFLOW_IMAGES = [
@@ -49,41 +49,58 @@ def build_default_telemetry(wetness: int) -> dict:
         "temperature_risk": "HIGH (Cooling)" if wetness > 50 else "LOW (Stable)"
     }
 
-async def analyze_frame(img: np.ndarray, image_url: str, t: float, session_id: str) -> dict:
-    """Full frame analysis: CV ONLY to bypass API limits, build decision record."""
+async def analyze_frame(img: np.ndarray, image_url: str, t: float, filter_states: dict, hyst: dict) -> dict:
+    """Full frame analysis: CV ONLY to bypass API limits, build decision record.
+
+    Mirrors main.py's _ingest_frame: raw per-frame CV wetness is a noisy
+    measurement fed through the same alpha-beta filter (temporal.py) the
+    live backend uses, so rate_line_per_min/crossover/hysteresis are real
+    instead of hardcoded zero — a hardcoded rate can never trigger
+    crossover_estimate() (it requires rate < 0), so "tire change window"
+    could never show anything but N/A before this.
+    """
     rois = roi_mod.process_rois(img, ROI_BOXES)
-    
-    # Use OpenCV analysis as evidence
+
     cv_ev = cv_analysis.analyze_frame(rois)
     telemetry = build_default_telemetry(cv_ev["line"]["wetness_0_100"])
     vlm_evidence = {
         "line": {**cv_ev["line"], "telemetry": telemetry},
         "off_line": {**cv_ev["off_line"]},
     }
-    w_line = cv_ev["line"]["wetness_0_100"] / 100.0
-    w_off_line = cv_ev["off_line"]["wetness_0_100"] / 100.0
-    model_confidence = 0.75
+    raw_w_line = cv_ev["line"]["wetness_0_100"] / 100.0
+    raw_w_off_line = cv_ev["off_line"]["wetness_0_100"] / 100.0
+    model_confidence = (cv_ev["line"]["confidence_0_100"] + cv_ev["off_line"]["confidence_0_100"]) / 200.0
     provider_name = "cv_analysis"
-    
-    print(f"  t={t:.0f}: CV OK | line_wet={cv_ev['line']['wetness_0_100']}% off_line_wet={cv_ev['off_line']['wetness_0_100']}%")
-    
-    # Build decision
+
+    filtered = {}
+    for name, raw_w in (("line", raw_w_line), ("off_line", raw_w_off_line)):
+        prev = filter_states.get(name)
+        state = temporal.FilterState.from_dict(prev) if prev else temporal.FilterState.initial(raw_w)
+        new_state, rate_per_min, _gap = temporal.update(state, raw_w, t)
+        filter_states[name] = new_state.to_dict()
+        filtered[name] = {"smoothed_w": new_state.x, "rate_per_min": rate_per_min}
+
+    print(f"  t={t:.0f}: CV OK | line_wet={cv_ev['line']['wetness_0_100']}% (rate={filtered['line']['rate_per_min']:.3f}/min) off_line_wet={cv_ev['off_line']['wetness_0_100']}%")
+
     dec = decision.build_decision(
         t=t,
-        w_line=w_line,
-        rate_line_per_min=0.0,
-        w_off_line=w_off_line,
-        rate_off_line_per_min=0.0,
+        w_line=filtered["line"]["smoothed_w"],
+        rate_line_per_min=filtered["line"]["rate_per_min"],
+        w_off_line=filtered["off_line"]["smoothed_w"],
+        rate_off_line_per_min=filtered["off_line"]["rate_per_min"],
         confidence_ok=model_confidence > 0.5,
         confidence_reasons=[],
         lap_time_s=90,
     )
-    
+
+    displayed_label, change_t = temporal.apply_hysteresis(hyst["label"], hyst["change_t"], dec["raw_label"], t)
+    hyst["label"], hyst["change_t"] = displayed_label, change_t
+
     return {
         **dec,
-        "displayed_label": dec["raw_label"],
-        "raw_w_line": w_line,
-        "raw_w_off_line": w_off_line,
+        "displayed_label": displayed_label,
+        "raw_w_line": raw_w_line,
+        "raw_w_off_line": raw_w_off_line,
         "model_confidence": model_confidence,
         "provider": provider_name,
         "evidence": vlm_evidence,
@@ -95,17 +112,19 @@ async def generate_dataset(dataset_id: str, images: list, scenario: str) -> dict
     """Generate a full dataset from a list of images."""
     print(f"\n=== Generating {dataset_id} ({scenario}) ===")
     frames = []
+    filter_states: dict = {}
+    hyst = {"label": None, "change_t": None}
     for i, (img, url) in enumerate(images):
         t = float(i * 30)  # 30-second intervals between frames
         try:
-            frame = await analyze_frame(img, url, t, dataset_id)
+            frame = await analyze_frame(img, url, t, filter_states, hyst)
             frames.append(frame)
             # Rate limit: 1 call per 2 seconds to avoid 429
             if i < len(images) - 1:
                 await asyncio.sleep(2.5)
         except Exception as e:
             print(f"  Frame {i} failed: {e}")
-    
+
     return {"id": dataset_id, "frames": frames}
 
 async def main():
