@@ -471,3 +471,86 @@ def download_dataset(session_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="dryline_dataset_{session_id}.zip"'},
     )
+
+
+# ── DryLine-Upgraded: Tyre Strategy Engine ────────────────────────────────────
+# These routes are additive — they do not modify any existing endpoint.
+# They expose the advanced tyre-strategy and temporal-filter logic from the
+# DryLine-upgraded package alongside the original pipeline.
+
+import strategy_decision as strat
+import strategy_state as strat_state
+from strategy_models import IngestRequest as StratIngestRequest, TyreState as StratTyreState, WeatherState as StratWeatherState
+
+
+@app.post("/api/ingest-observation")
+def strategy_ingest(req: StratIngestRequest):
+    """Accept a structured observation (wetness, tyre, weather) and return
+    a full tyre strategy decision with temporal filtering and whiplash detection.
+    """
+    state = strat_state.get_strategy_session(req.session_id)
+    return strat.process_observation(
+        req.session_id, state, req.observation,
+        req.tyre, req.weather, req.lap_time_seconds,
+    )
+
+
+@app.post("/api/analyze-frame")
+async def strategy_analyze_frame(
+    file: UploadFile = File(...),
+    session_id: str = Form("default"),
+    tyre_json: str = Form("{}"),
+    weather_json: str = Form("{}"),
+    lap_time_seconds: float = Form(90.0),
+):
+    """Upload a track camera frame; applies the frame quality gate and returns
+    a full tyre strategy decision. Falls back to heuristic CV when no VLM key
+    is available (same as the existing pipeline for standalone use).
+    """
+    import json as _json
+    from quality_gate import assess_image_quality
+    from vision_adapter import heuristic_observation
+
+    raw = await file.read()
+    image = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+    state = strat_state.get_strategy_session(session_id)
+    tyre = StratTyreState(**_json.loads(tyre_json or "{}"))
+    weather_dict = _json.loads(weather_json or "{}")
+    weather: Optional[StratWeatherState] = StratWeatherState(**weather_dict) if weather_dict else None
+
+    quality, gray = assess_image_quality(image, state.previous_gray)
+    if gray.size:
+        state.previous_gray = gray
+
+    if not quality.accepted:
+        return strat.rejected_result(session_id, state, tyre, __import__("time").time(), quality.reasons)
+
+    observation = heuristic_observation(image, quality.quality)
+    observation.notes.extend(quality.reasons)
+    return strat.process_observation(
+        session_id, state, observation, tyre, weather, lap_time_seconds,
+    )
+
+
+@app.get("/api/session-v2/{session_id}")
+def strategy_session_snapshot(session_id: str):
+    """Return the latest strategy session state (condition, wetness, trend)."""
+    import time as _time
+    state = strat_state.get_strategy_session(session_id)
+    age = None if state.last_valid_timestamp is None else max(0.0, _time.time() - state.last_valid_timestamp)
+    return {
+        "session_id": session_id,
+        "condition": state.last_condition,
+        "filtered_wetness": state.filtered_wetness,
+        "rate_per_min": state.filtered_rate_per_sec * 60,
+        "last_valid_age_seconds": age,
+        "rejected_frames": state.rejected_frames,
+        "trend": [s.__dict__ for s in state.trend[-60:]],
+    }
+
+
+@app.post("/api/reset-v2/{session_id}")
+def strategy_reset_session(session_id: str):
+    """Reset strategy session state (does NOT affect the existing session store)."""
+    strat_state.STRATEGY_SESSIONS.pop(session_id, None)
+    return {"ok": True, "session_id": session_id}

@@ -22,6 +22,7 @@ import Footer from "./components/Footer";
 import SessionSummary from "./components/SessionSummary";
 import DatasetPanel from "./components/DatasetPanel";
 import InferenceLog from "./components/InferenceLog";
+import StrategyEngine from "./components/StrategyEngine";
 
 const DEMO_CONFIG = {
   name: "frontend-demo",
@@ -350,7 +351,7 @@ export default function App() {
             <ConditionHistoryView frames={frames} lapTimeS={lapTimeS} naiveMode={naiveMode} onToggleNaive={() => setNaiveMode(m => !m)} />
           )}
           {activeNav === "strategy" && (
-            <StrategyView frame={latest} naiveMode={naiveMode} onToggleNaive={() => setNaiveMode(m => !m)} />
+            <StrategyView frame={latest} naiveMode={naiveMode} onToggleNaive={() => setNaiveMode(m => !m)} sessionId={sessionId} />
           )}
           {activeNav === "logs" && (
             <LogsView frame={latest} isProcessing={isProcessing} sessionId={sessionId} />
@@ -787,11 +788,12 @@ function ConditionHistoryView({
 
 // ── Strategy Hub View ────────────────────────────────────────
 function StrategyView({
-  frame, naiveMode, onToggleNaive,
+  frame, naiveMode, onToggleNaive, sessionId,
 }: {
   frame: DecisionFrame | null;
   naiveMode: boolean;
   onToggleNaive: () => void;
+  sessionId: string | null;
 }) {
   const getCompoundColor = (type: string, active: boolean) => {
     if (!active) return "var(--text-dim)";
@@ -926,6 +928,20 @@ function StrategyView({
 
             </div>
           )}
+
+          {/* ── DryLine-Upgraded: Tyre Strategy Engine ── */}
+          <div>
+            <h2 style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.15em", color: "var(--text-dim)", textTransform: "uppercase", marginBottom: 12 }}>
+              🏁 Tyre Strategy Engine
+            </h2>
+            <div
+              className="glass-panel animate-fade-in"
+              style={{ borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)", background: "rgba(8,12,18,0.5)" }}
+            >
+              <StrategyEngine sessionId={sessionId} />
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
